@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Monthly Sales Details</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f9f9f9; }
+    .container { max-width: 1200px; margin-top: 30px; }
+    .table thead { background-color: #007bff; color: #fff; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h2>Monthly Sales Details</h2>
+  <p class="text-muted">แสดงข้อมูลแบบละเอียด แยกตาม procedure_name</p>
+
+  <!-- Form เลือกเดือน -->
+  <form method="GET" action="{{ url_for('monthly_sales_details') }}" class="row g-3 align-items-end mb-4">
+    <div class="col-auto">
+      <label for="month" class="form-label">เลือกเดือน (YYYY-MM)</label>
+      <input type="month" class="form-control" id="month" name="month" 
+             value="{{ selected_month|default('') }}">
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-primary">ค้นหา</button>
+    </div>
+  </form>
+
+  <!-- ตาราง: user, category, procedure_name, amount, count -->
+  <table class="table table-bordered table-hover align-middle">
+    <thead>
+      <tr>
+        <th>User (pr_code + name)</th>
+        <th>Category</th>
+        <th>Procedure Name</th>
+        <th class="text-end">ยอดขาย (บาท)</th>
+        <th class="text-end">จำนวนเคส</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in list_rows %}
+      <tr>
+        <td>
+          <strong>{{ row.user_pr_code }}</strong><br>
+          {{ row.user_name }} ({{ row.user_role }})
+        </td>
+        <td>{{ row.category }}</td>
+        <td>{{ row.procedure_name }}</td>
+        <td class="text-end">{{ "{:,}".format(row.amount) }}</td>
+        <td class="text-end">{{ row.count }}</td>
+      </tr>
+      {% endfor %}
+
+      {% if list_rows|length == 0 %}
+      <tr>
+        <td colspan="5" class="text-muted text-center">
+          ไม่พบข้อมูลในเดือนที่เลือก
+        </td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <div class="text-end mt-3">
+    <a href="/admin" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

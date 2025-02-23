@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Payday Config (Monthly)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+  <style>
+    body { background-color: #f9f9f9; }
+    .container { max-width: 900px; margin-top: 30px; background: #fff; padding: 20px; }
+    .table thead { background-color: #007bff; color: #fff; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <h2 class="mb-4">แก้ไขวันจ่ายเงินเดือน และ เงินสวัสดิการ</h2>
+
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, msg in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <!-- เลือกเดือน/ปี -->
+  <form method="GET" class="row g-2 mb-3">
+    <div class="col-auto">
+      <label>ปี</label>
+      <select name="year" class="form-select">
+        {% set this_year = year %}
+        {% for y in range(this_year-1, this_year+2) %}
+        <option value="{{y}}" {% if y==year %}selected{% endif %}>{{y}}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <label>เดือน</label>
+      <select name="month" class="form-select">
+        {% for m in range(1,13) %}
+        <option value="{{m}}" {% if m==month %}selected{% endif %}>{{m}}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto align-self-end">
+      <button type="submit" class="btn btn-primary">เลือก</button>
+    </div>
+  </form>
+
+  <!-- ฟอร์ม apply to all -->
+  <div class="card mb-4">
+    <div class="card-header bg-danger text-white">แก้ไขวันที่ (ทุกคน)</div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('manage_payday_config') }}" class="row g-3 align-items-end">
+        <input type="hidden" name="action" value="update_all">
+        <input type="hidden" name="post_year" value="{{ year }}">
+        <input type="hidden" name="post_month" value="{{ month }}">
+        <div class="col-auto">
+          <label for="salary_pay_day_all" class="form-label">วันจ่ายเงินเดือน</label>
+          <input type="number" min="1" max="31" class="form-control"
+                 name="salary_pay_day_all" id="salary_pay_day_all"
+                 value="{{ global_salary|default(28) }}">
+        </div>
+        <div class="col-auto">
+          <label for="welfare_pay_day_all" class="form-label">วันจ่ายเงินสวัสดิการ</label>
+          <input type="number" min="1" max="31" class="form-control"
+                 name="welfare_pay_day_all" id="welfare_pay_day_all"
+                 value="{{ global_welfare|default(10) }}">
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-danger">บันทึกสำหรับทุกคน (เดือน {{month}}/{{year}})</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <h3>แก้ไขวันที่ (รายบุคคล)  . . .  เดือน {{month}} / {{year}}</h3>
+  <table class="table table-bordered table-hover">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>ชื่อ-นามสกุล</th>
+        <th>ชื่อเล่น</th>
+        <th>วันจ่ายเงินเดือน</th>
+        <th>วันจ่ายเงินสวัสดิการ</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in user_rows %}
+      {% set config = cfg_map[u.user_id] if u.user_id in cfg_map else None %}
+      <tr>
+        <td>{{ u.user_id }}</td>
+        <td>{{ u.first_name }} {{ u.last_name }}</td>
+        <td>{{ u.nickname }}</td>
+        <td>
+          <input type="number" min="1" max="31" class="form-control"
+                 id="sal_{{u.user_id}}"
+                 value="{{ config.salary if config else global_salary }}">
+        </td>
+        <td>
+          <input type="number" min="1" max="31" class="form-control"
+                 id="wel_{{u.user_id}}"
+                 value="{{ config.welfare if config else global_welfare }}">
+        </td>
+        <td>
+          <form method="POST" action="{{ url_for('manage_payday_config') }}" class="d-flex">
+            <input type="hidden" name="action" value="update_single">
+            <input type="hidden" name="post_year" value="{{ year }}">
+            <input type="hidden" name="post_month" value="{{ month }}">
+
+            <input type="hidden" name="user_id" value="{{ u.user_id }}">
+            <input type="hidden" name="salary_pay_day"  id="salary_pay_day_{{u.user_id}}"  value="">
+            <input type="hidden" name="welfare_pay_day" id="welfare_pay_day_{{u.user_id}}" value="">
+            <button type="button" class="btn btn-sm btn-primary me-2"
+                    onclick="preparePaydayForm({{u.user_id}})">บันทึก</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <a href="/dashboard" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
+</div>
+
+<script>
+function preparePaydayForm(uid) {
+  const salInput = document.getElementById("sal_"+uid);
+  const welInput = document.getElementById("wel_"+uid);
+  const salHidden = document.getElementById("salary_pay_day_"+uid);
+  const welHidden = document.getElementById("welfare_pay_day_"+uid);
+
+  salHidden.value = salInput.value;
+  welHidden.value = welInput.value;
+
+  salHidden.closest("form").submit();
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

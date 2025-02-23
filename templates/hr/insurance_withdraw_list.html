@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>คำขอเบิกเงินสะสม (HR)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f9f9f9; }
+    .container { max-width: 1200px; margin: 40px auto; }
+    .card-header { background-color: #6610f2; color: #fff; }
+    .table thead th {
+      background-color: #6610f2;
+      color: #fff;
+      text-align: center;
+    }
+    .table th, .table td {
+      vertical-align: middle;
+      text-align: center;
+    }
+    .btn-sm {
+      padding: 0.2rem 0.5rem;
+      font-size: 0.8rem;
+      line-height: 1.2;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="card shadow">
+    <div class="card-header">
+      <h4 class="m-0">คำขอเบิกเงินสะสม</h4>
+    </div>
+    <div class="card-body">
+
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category,msg in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ msg }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% if requests|length == 0 %}
+      <div class="alert alert-info">ยังไม่มีคำขอเบิกเงินสะสม</div>
+      {% else %}
+      <div class="table-responsive">
+        <table class="table table-bordered">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>ชื่อ-นามสกุล</th>
+              <th>วันที่ขอ</th>
+              <th>จำนวนเบิก</th>
+              <th>ผ่อน (เดือน)</th>
+              <th>คืนต่อเดือน</th>
+              <th>สถานะ</th>
+              <th>วันที่อนุมัติ/ปฏิเสธ</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in requests %}
+            <tr>
+              <td>{{ r.request_id }}</td>
+              <td>{{ r.first_name }} {{ r.last_name }}</td>
+              <td>{{ r.request_date }}</td>
+              <td>{{ "{:,.2f}".format(r.withdraw_amount or 0) }}</td>
+              <td>{{ r.repay_months }}</td>
+              <td>{{ "{:,.2f}".format(r.monthly_repay or 0) }}</td>
+              <td>{{ r.status }}</td>
+              <td>
+                {% if r.updated_at %}
+                  {{ r.updated_at }}
+                {% else %}
+                  {% if r.status == 'pending' %}
+                    (ยังไม่อนุมัติ)
+                  {% endif %}
+                {% endif %}
+              </td>
+              <td>
+                {% if r.status == 'pending' %}
+                  <form method="POST" 
+                        action="{{ url_for('insurance_withdraw_approve') }}"
+                        style="display:inline;">
+                    <input type="hidden" name="request_id" value="{{ r.request_id }}">
+                    <button name="action" value="approve" class="btn btn-sm btn-success">อนุมัติ</button>
+                    <button name="action" value="reject" class="btn btn-sm btn-danger">ปฏิเสธ</button>
+                  </form>
+                {% else %}
+                  ({{ r.status }})
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      <div class="text-end mt-3">
+        <a href="/dashboard" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

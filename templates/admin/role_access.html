@@ -1,0 +1,30 @@
+<table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>ฟังก์ชัน</th>
+        <th>URL</th>
+        {% for role in roles %}
+        <th>{{ role.role_name }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for function in functions %}
+      <tr>
+        <td>{{ function.function_name }}</td>
+        <td>{{ function.url }}</td>
+        {% for role in roles %}
+        <td>
+          <select name="access_{{ role.role_id }}_{{ function.function_id }}" class="form-select">
+            <option value="none" {% if role_access[role.role_id][function.function_id] == 'none' %}selected{% endif %}>ไม่มีสิทธิ์</option>
+            <option value="read" {% if role_access[role.role_id][function.function_id] == 'read' %}selected{% endif %}>ดูข้อมูล</option>
+            <option value="write" {% if role_access[role.role_id][function.function_id] == 'write' %}selected{% endif %}>แก้ไขข้อมูล</option>
+            <option value="full" {% if role_access[role.role_id][function.function_id] == 'full' %}selected{% endif %}>จัดการทั้งหมด</option>
+          </select>
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  

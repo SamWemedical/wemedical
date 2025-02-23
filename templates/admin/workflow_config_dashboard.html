@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Workflow Configuration Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f9f9f9;
+      font-family: "Sarabun", sans-serif;
+    }
+    .container-fluid {
+      width: 100%;
+      padding: 20px;
+      background: #fff;
+    }
+    .card {
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .card-header {
+      background-color: #0d6efd;
+      color: #fff;
+      text-align: center;
+      padding: 16px;
+    }
+    .table th, .table td {
+      text-align: center;
+      vertical-align: middle;
+    }
+    select.form-select[multiple] {
+      height: 120px;
+    }
+    .btn-group-bottom {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 20px;
+    }
+    /* สำหรับ Allowed Subcategory (Current): ให้แต่ละรายการอยู่ใน div ที่มีเส้นแบ่งด้านล่าง */
+    .allowed-item {
+      border-bottom: 1px solid #ddd;
+      padding: 2px 0;
+    }
+    .delete-btn {
+      margin-left: 5px;
+      font-size: 0.8rem;
+    }
+    /* สำหรับ Allowed Subcategory (แก้ไข): แต่ละ candidate อยู่ใน div พร้อมปุ่ม Add */
+    .candidate-item {
+      border-bottom: 1px solid #ddd;
+      padding: 2px 0;
+    }
+    .add-btn {
+      margin-left: 5px;
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+<div class="container-fluid">
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, msg in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ msg }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="card">
+    <div class="card-header">
+      <h4>Workflow Configuration Dashboard</h4>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover">
+          <thead class="table-light">
+            <tr>
+              <th>Config ID</th>
+              <th>Function Key</th>
+              <th>Require Subcategory</th>
+              <th>Allowed Subcategory</th>
+              <th>NOT Allowed Subcategory</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for config in configs %}
+            <tr>
+              <!-- Column 1: Config ID -->
+              <td>
+                {{ config.config_id }}
+              </td>
+              <!-- Column 2: Function Key -->
+              <td>{{ config.function_key }}</td>
+              <!-- Column 3: Require Subcategory & Description (Update Form) -->
+              <td>
+                <form method="POST" action="{{ url_for('workflow_config_dashboard') }}">
+                  <input type="hidden" name="config_id" value="{{ config.config_id }}">
+                  <div class="mb-2">
+                    <select name="require_subcategory" class="form-select">
+                      <option value="1" {% if config.require_subcategory %}selected{% endif %}>Yes</option>
+                      <option value="0" {% if not config.require_subcategory %}selected{% endif %}>No</option>
+                    </select>
+                  </div>
+                  <div>
+                    <input type="text" name="description" value="{{ config.description or '' }}" class="form-control" placeholder="Description">
+                  </div>
+                  <!-- ให้ Update สำหรับค่าใน column นี้ -->
+                  <div class="mt-2">
+                    <button type="submit" class="btn btn-primary btn-sm">Update</button>
+                  </div>
+                </form>
+              </td>
+              <!-- Column 4: Allowed Subcategory (Current) -->
+              <td>
+                {% if config.allowed_list|length > 0 %}
+                  {% for a in config.allowed_list %}
+                    {% for sub in subcategories %}
+                      {% if sub.sub_category_id|string == a %}
+                        <div class="allowed-item">
+                          {{ sub.sub_category_name }}
+                          <!-- Form for Delete button -->
+                          <form method="POST" action="{{ url_for('delete_allowed_subcategory') }}" style="display:inline;">
+                            <input type="hidden" name="config_id" value="{{ config.config_id }}">
+                            <input type="hidden" name="sub_category_id" value="{{ a }}">
+                            <button type="submit" class="btn btn-sm btn-danger delete-btn">Delete</button>
+                          </form>
+                        </div>
+                      {% endif %}
+                    {% endfor %}
+                  {% endfor %}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <!-- Column 5: Allowed Subcategory (แก้ไข) -->
+              <td>
+                {% set candidates = [] %}
+                {% for sub in subcategories %}
+                  {% if sub.sub_category_id|string not in config.allowed_list %}
+                    {% set _ = candidates.append(sub) %}
+                  {% endif %}
+                {% endfor %}
+                {% if candidates|length > 0 %}
+                  {% for candidate in candidates %}
+                    <div class="candidate-item">
+                      {{ candidate.sub_category_name }}
+                      <!-- Form for Add button -->
+                      <form method="POST" action="{{ url_for('workflow_config_dashboard') }}" style="display:inline;">
+                        <input type="hidden" name="config_id" value="{{ config.config_id }}">
+                        <input type="hidden" name="require_subcategory" value="{{ config.require_subcategory }}">
+                        <input type="hidden" name="description" value="{{ config.description or '' }}">
+                        <!-- ส่ง candidate id เป็น new_allowed_subcategory_ids -->
+                        <input type="hidden" name="new_allowed_subcategory_ids" value="{{ candidate.sub_category_id }}">
+                        <button type="submit" class="btn btn-sm btn-success add-btn">Add</button>
+                      </form>
+                    </div>
+                  {% endfor %}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="btn-group-bottom">
+        <a href="/admin" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Monthly Sales Summary</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f9f9f9; }
+    .container { max-width: 1200px; margin-top: 30px; }
+    .table thead { background-color: #007bff; color: #fff; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h2>Monthly Sales Summary</h2>
+  <p class="text-muted">สำหรับ Employee / Manager ที่มี pr_code</p>
+
+  <!-- Form เลือกเดือน (YYYY-MM) -->
+  <form method="GET" action="{{ url_for('monthly_sales') }}" class="row g-3 align-items-end mb-4">
+    <div class="col-auto">
+      <label for="month" class="form-label">เลือกเดือน</label>
+      <input type="month" class="form-control" id="month" name="month" value="{{ selected_month|default('') }}">
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-primary">ค้นหา</button>
+    </div>
+  </form>
+
+  <!-- แสดงผลในรูปแบบตาราง:
+       column = user (pr_code + name), 
+                 SX(บาท), SX(เคส),
+                 AES(บาท), AES(เคส),
+                 AFC(บาท), AFC(เคส)
+  -->
+  <table class="table table-bordered table-hover align-middle">
+    <thead>
+      <tr>
+        <th>User (pr_code + Name)</th>
+        {% for cat in categories %}
+          <th>{{ cat }} (บาท)</th>
+          <th>{{ cat }} (เคส)</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      <!-- วน user_map -->
+      {% for pr_code, uinfo in user_map.items() %}
+      <tr>
+        <td>
+          <strong>{{ pr_code }}</strong><br>
+          {{ uinfo.name }} ({{ uinfo.role }})
+        </td>
+
+        {% for cat in categories %}
+          {% set key = (pr_code, cat) %}
+          {% set amount = sums[key].amount if key in sums else 0 %}
+          {% set count = sums[key].count if key in sums else 0 %}
+          <td class="text-end">{{ "{:,}".format(amount) }}</td>
+          <td class="text-end">{{ count }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="text-end mt-3">
+    <a href="/admin" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

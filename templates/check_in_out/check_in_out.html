@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>บันทึกเวลาเข้า-ออกงาน</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f9f9f9;
+      font-family: "Sarabun", sans-serif;
+    }
+    .checkin-container {
+      max-width: 600px;
+      margin: 40px auto;
+    }
+    .card-header {
+      background-color: #198754; /* สีเขียว */
+      color: #fff;
+    }
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .btn-lg {
+      padding: 0.75rem 1.5rem;
+      font-size: 1.25rem;
+    }
+    /* Override สีปุ่มที่ disabled ให้เป็นสีเทา */
+    button:disabled {
+      background-color: #6c757d !important;
+      border-color: #6c757d !important;
+      color: #fff !important;
+      cursor: not-allowed;
+    }
+    /* Modal Confirmation สำหรับ OT */
+    .modal-title {
+      font-size: 1.8rem;
+      font-weight: bold;
+    }
+    .modal-body p {
+      font-size: 1.5rem;
+      text-align: center;
+    }
+    .modal-body .form-label {
+      font-size: 1.5rem;
+    }
+    .modal-body .form-control {
+      font-size: 1.3rem;
+      padding: 0.5rem;
+    }
+    .modal-footer .btn-lg {
+      font-size: 1.3rem;
+      padding: 0.75rem 1.5rem;
+    }
+  </style>
+</head>
+<body>
+<div class="checkin-container">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="m-0">บันทึกเวลาเข้า-ออกงาน</h3>
+    </div>
+    <div class="card-body">
+      <!-- แสดงสถานะของการบันทึกเวลา -->
+      {% if status == 'ready_to_checkin' %}
+        <div class="alert alert-info">
+          <strong>ยังไม่บันทึกเวลาเข้างาน</strong>
+        </div>
+      {% else %}
+        <div class="alert alert-info">
+          เวลาเข้างาน: <strong>{{ checkin_time }}</strong>
+        </div>
+      {% endif %}
+
+      <!-- กลุ่มปุ่มสำหรับ Check In และ Check Out -->
+      <div class="btn-group">
+        <!-- Form สำหรับ Check In -->
+        <form method="POST" id="formCheckIn" style="flex: 1;">
+          <input type="hidden" name="action" value="checkin">
+          <button type="submit" class="btn btn-success btn-lg"
+            {% if status == 'ready_to_checkout' %}disabled{% endif %}>
+            บันทึกเวลาเข้างาน
+          </button>
+        </form>
+        <!-- Form สำหรับ Check Out -->
+        <form method="POST" id="formCheckOut" style="flex: 1;">
+          <!-- ไม่แสดงช่องกรอก ot_reason ที่นี่แล้ว -->
+          <input type="hidden" name="action" value="checkout">
+          <button type="submit" class="btn btn-danger btn-lg"
+            {% if status == 'ready_to_checkin' %}disabled{% endif %}>
+            บันทึกเวลาเลิกงาน
+          </button>
+        </form>
+      </div>
+      
+      <hr>
+      <p>1) สามารถบันทึกเวลาเข้า-ออกงานได้วันละ 1 ครั้ง</p>
+      <p>2) ต้องบันทึกเวลาเข้างานก่อนจึงจะสามารถบันทึกเวลาเลิกงานได้</p>
+      <p>3) ควรใช้อินเทอร์เน็ตของคลินิกในการล็อกอิน</p>
+      
+      <div class="mt-3 text-center">
+        <a href="/dashboard" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
+      </div>
+    </div><!-- card-body -->
+  </div><!-- card -->
+</div><!-- container -->
+
+<!-- Modal Confirmation สำหรับ OT -->
+<div class="modal fade" id="otConfirmModal" tabindex="-1" aria-labelledby="otConfirmModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title" id="otConfirmModalLabel">ยืนยันการขออนุมัติ OT</h4>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="fs-4">คุณต้องการขออนุมัติ OT หรือไม่?</p>
+        <p class="fs-4">โปรดเลือกตัวเลือกด้านล่าง</p>
+        <!-- ช่องกรอกเหตุผล OT อยู่ใน Modal -->
+        <div class="mb-3">
+          <label for="modal_ot_reason" class="form-label">กรอกเหตุผล OT</label>
+          <input type="text" id="modal_ot_reason" class="form-control" placeholder="ระบุเหตุผล OT">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="btnOtApprove" class="btn btn-success btn-lg">ขออนุมัติ OT</button>
+        <button type="button" id="btnOtNormal" class="btn btn-secondary btn-lg">ไม่ขออนุมัติ OT</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap Bundle JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // ดึง element จาก DOM
+  const formCheckOut = document.getElementById("formCheckOut");
+  const otConfirmModalEl = document.getElementById("otConfirmModal");
+  const otConfirmModal = new bootstrap.Modal(otConfirmModalEl);
+  const btnOtApprove = document.getElementById("btnOtApprove");
+  const btnOtNormal = document.getElementById("btnOtNormal");
+  const modalOtReason = document.getElementById("modal_ot_reason");
+
+  // เมื่อ form Check Out ถูก submit ให้หยุดการส่งและแสดง modal
+  if (formCheckOut) {
+    formCheckOut.addEventListener("submit", function(event) {
+      event.preventDefault();
+      otConfirmModal.show();
+    });
+  }
+
+  // เมื่อกด "ขออนุมัติ OT"
+  btnOtApprove.addEventListener("click", function() {
+    if (modalOtReason.value.trim() === "") {
+      alert("กรุณากรอกเหตุผล OT เพื่อขออนุมัติ OT");
+      return;
+    }
+    let hiddenOtInput = document.querySelector("input[name='ot_reason']");
+    if (!hiddenOtInput) {
+      hiddenOtInput = document.createElement("input");
+      hiddenOtInput.type = "hidden";
+      hiddenOtInput.name = "ot_reason";
+      formCheckOut.appendChild(hiddenOtInput);
+    }
+    hiddenOtInput.value = modalOtReason.value.trim();
+    otConfirmModal.hide();
+    formCheckOut.submit();
+  });
+
+  // เมื่อกด "ไม่ขออนุมัติ OT"
+  btnOtNormal.addEventListener("click", function() {
+    let hiddenOtInput = document.querySelector("input[name='ot_reason']");
+    if (!hiddenOtInput) {
+      hiddenOtInput = document.createElement("input");
+      hiddenOtInput.type = "hidden";
+      hiddenOtInput.name = "ot_reason";
+      formCheckOut.appendChild(hiddenOtInput);
+    }
+    hiddenOtInput.value = "";
+    otConfirmModal.hide();
+    formCheckOut.submit();
+  });
+</script>
+</body>
+</html>

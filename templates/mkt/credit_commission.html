@@ -1,0 +1,151 @@
+<!-- credit_commission.html (ฉบับแก้ไข) -->
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Credit Commission</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .card + .card { margin-top: 1rem; }
+  </style>
+</head>
+<body>
+<div class="container my-4">
+  <h1>บันทึก Credit (การตลาด)</h1>
+
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, msg in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <!-- Filter year, month (GET) -->
+  <form method="GET" class="row g-2 mb-3">
+    <div class="col-auto">
+      <label>ปี:</label>
+      <select name="year" class="form-select">
+        {% set this_year = year %}
+        {% for y in range(this_year-1, this_year+2) %}
+        <option value="{{ y }}" {% if y==year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <label>เดือน:</label>
+      <select name="month" class="form-select">
+        {% for m in range(1,13) %}
+        <option value="{{ m }}" {% if m==month %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto" style="padding-top:1.8rem;">
+      <button type="submit" class="btn btn-primary">เลือกเดือน</button>
+    </div>
+  </form>
+
+  <!-- Form บันทึก credit (ในเดือน/ปี ที่เลือก) -->
+  <form method="POST">
+    <!-- เก็บ year,month ไว้ใน hidden field -->
+    <input type="hidden" name="post_year" value="{{ year }}">
+    <input type="hidden" name="post_month" value="{{ month }}">
+
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <h4 class="m-0">เดือน {{ month }} ปี {{ year }}</h4>
+      </div>
+      <div class="card-body">
+        <!-- ตาราง user subcat=12 -->
+        <table class="table table-bordered table-hover">
+          <thead class="table-light">
+            <tr>
+              <th>#</th>
+              <th>ชื่อเล่น</th>
+              <th>ชื่อ-นามสกุล</th>
+              <th>Credit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in user_rows %}
+            <tr>
+              <td>{{ u.user_id }}
+                <input type="hidden" name="user_id[]" value="{{ u.user_id }}">
+              </td>
+              <td>{{ u.nickname or '' }}</td>
+              <td>{{ u.first_name }} {{ u.last_name }}</td>
+              <td>
+                {% set val = cc_map[u.user_id] if u.user_id in cc_map else 0.0 %}
+                <input type="number" step="0.01" class="form-control"
+                       name="credit_value[]" value="{{ '{:.2f}'.format(val) }}">
+              </td>
+            </tr>
+            {% endfor %}
+            {% if user_rows|length == 0 %}
+            <tr>
+              <td colspan="4" class="text-center text-muted">No user in subcat=12</td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer text-end">
+        <button type="submit" class="btn btn-success">บันทึก</button>
+        <a href="/dashboard" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
+      </div>
+    </div>
+  </form>
+
+  <hr>
+  <!-- Section แสดงผลสรุป (history) เรียงเดือนใหม่บนสุด -->
+  <h3 class="mt-4">Credit รายเดือน ย้อนหลัง</h3>
+
+  {% for h in history_data %}
+  <div class="card">
+    <div class="card-header">
+      <strong>เดือน: {{ h.month }}/{{ h.year }}</strong>
+    </div>
+    <div class="card-body">
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>ชื่อ</th>
+            <th>Credit</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- เดิม: for item in h.items  (ไม่มีวงเล็บ) => error -->
+          <!-- แก้เป็น for item in h["items"] หรือ h.items() -->
+          {% for item in h["items"] %}
+          <tr>
+            <td>{{ item.user_id }}</td>
+            <td>{{ item.nickname }}</td>
+            <td>{{ "{:.2f}".format(item.credit_value) }}</td>
+          </tr>
+          {% endfor %}
+          {% if h["items"]|length == 0 %}
+          <tr>
+            <td colspan="3" class="text-center text-muted">ยังไม่มีข้อมูลของเดือนนี้</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+  {% if history_data|length == 0 %}
+  <p class="text-muted">ยังไม่มีประวัติ</p>
+  {% endif %}
+  <a href="/dashboard" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

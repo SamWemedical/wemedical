@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>Daily Income Records (รายรับประจำวัน)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <style>
+    body {
+      background-color: #f9f9f9;
+    }
+    .container {
+      max-width: 1200px; 
+      margin-top: 40px;
+    }
+    .main-table {
+      border: 1px solid #dee2e6;
+    }
+    .main-table thead {
+      background-color: #e9ecef;
+    }
+    thead.custom-header {
+      background-color: #ff00d4;
+      color: #ffffff;
+    }
+    .procedure-row {
+      margin-bottom: 10px;
+      padding: 10px;
+      border: 1px solid #dee2e6;
+      border-radius: 5px;
+      background-color: #fff;
+      position: relative;
+    }
+    .remove-procedure {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+    }
+    .prWarningBox {
+      display: none;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1 class="mb-4">บัญชีรายรับประจำวัน</h1>
+
+  <!-- SECTION: Search Form (AJAX) -->
+  <div class="mb-3">
+    <label for="customerSearchInput" class="form-label">ค้นหาลูกค้า</label>
+    <div class="input-group">
+      <input type="text" class="form-control" id="customerSearchInput" placeholder="HN, ชื่อ, นามสกุล, ชื่อเล่น, เบอร์โทรฯ">
+      <button type="button" class="btn btn-primary" onclick="searchCustomers()">ค้นหา</button>
+    </div>
+  </div>
+  <!-- ผลการค้นหา -->
+  <div id="searchResultsArea"></div>
+
+  <!-- SECTION: เลือกวันที่ -->
+  <form method="GET" action="{{ url_for('daily_income') }}" class="mb-4">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label for="record_date" class="form-label">เลือกวันที่</label>
+        <input type="date" class="form-control" id="record_date" name="record_date" 
+               value="{{ record_date|default(current_date) }}">
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary">แสดงข้อมูล</button>
+      </div>
+    </div>
+  </form>
+
+  <!-- SECTION: ตารางแสดง Daily Income -->
+  <h3>รายการรายรับประจำวัน: {{ record_date|default(current_date) }}</h3>
+
+  <table class="table table-bordered table-hover main-table">
+    <thead class="custom-header">
+      <tr>
+        <th>ชื่อ-นามสกุล</th>
+        <th>ยอดรวม</th>
+        <th>มัดจำ</th>
+        <th>เงินสด</th>
+        <th>เงินโอน</th>
+        <th>รูดบัตร</th>
+        <th>ค่าธรรมเนียม</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rec in daily_income_list %}
+        <tr>
+          <td>{{ rec.customer_name }}</td>
+          <td>{{ "{:,}".format(rec.total_price) if rec.total_price else "-" }}</td>
+          <td>{{ "{:,}".format(rec.deposit) if rec.deposit else "-" }}</td>
+          <td>{{ "{:,}".format(rec.cash) if rec.cash else "-" }}</td>
+          <td>{{ "{:,}".format(rec.transfer) if rec.transfer else "-" }}</td>
+          <td>{{ "{:,}".format(rec.credit_card) if rec.credit_card else "-" }}</td>
+          <td>{{ "{:,}".format(rec.credit_card_fee) if rec.credit_card_fee else "-" }}</td>
+          <td>
+            <!-- ปุ่ม "รายละเอียด" => เรียก showDetailModal(rec.id) -->
+            <button class="btn btn-sm btn-info"
+                onclick="showDetailModal({{ rec.id }}, '{{ rec.customer_name }}')">
+              รายละเอียด
+            </button>
+
+            <!-- เงื่อนไข: เฉพาะวันปัจจุบัน ถึงจะแก้ไข/ลบได้ -->
+            {% if record_date|default(current_date) == current_date %}
+              <!-- ปุ่ม "แก้ไข" =>
+                  ไปหน้า edit_daily_income(income_id=rec.id) -->
+              <a href="{{ url_for('edit_daily_income', income_id=rec.id) }}"
+                class="btn btn-sm btn-warning">
+                แก้ไข
+              </a>
+
+              <!-- ปุ่ม "ลบ" => POST to delete_daily_income(income_id=rec.id) -->
+              <form method="POST"
+                    action="{{ url_for('delete_daily_income', income_id=rec.id) }}"
+                    style="display:inline;"
+                    onsubmit="return confirm('ยืนยันลบรายการนี้หรือไม่?');">
+                <button type="submit" class="btn btn-sm btn-danger">
+                  ลบ
+                </button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+    
+    <!-- <tfoot> แสดงค่าที่ pass มาจาก Backend -->
+    {% if daily_income_list|length > 0 %}
+    <tfoot class="table-success">
+      <tr>
+        <th colspan="1" class="text-end">รวม</th>
+        <th>{{ "{:,}".format(sum_total_price) }}</th>
+        <th>{{ "{:,}".format(sum_deposit) }}</th>
+        <th>{{ "{:,}".format(sum_cash) }}</th>
+        <th>{{ "{:,}".format(sum_transfer) }}</th>
+        <th>{{ "{:,}".format(sum_credit_card) }}</th>
+        <th>{{ "{:,}".format(sum_credit_card_fee) }}</th>
+        <th></th>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+
+  <a href="/dashboard" class="btn btn-secondary mt-3">กลับสู่หน้าหลัก</a>
+</div>
+
+<!-- Modal: Add Daily Income -->
+<div class="modal fade" id="addIncomeModal" tabindex="-1" aria-labelledby="addIncomeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form id="dailyIncomeForm" method="POST" action="{{ url_for('daily_income') }}"
+            onsubmit="return prepareProceduresData();">
+        <div class="modal-header">
+          <h5 class="modal-title" id="addIncomeModalLabel">เพิ่มในบัญชีรายรับประจำวันที่: {{ current_date|default('') }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <!-- SECTION 1: Customer Information -->
+          <div class="card mb-3">
+            <div class="card-header bg-primary text-white">ข้อมูลคนไข้</div>
+            <div class="card-body">
+              <input type="hidden" id="customer_id" name="customer_id">
+              <div class="mb-3">
+                <label class="form-label">HN - ชื่อนามสกุล</label>
+                <input type="text" class="form-control" id="customer_info"
+                       placeholder="กรุณาเลือกจากการค้นหา" readonly>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 2: Procedure Details -->
+          <div class="card mb-3">
+            <div class="card-header bg-primary text-white">หัตถการ</div>
+            <div class="card-body">
+              <div id="procedureList">
+                <!-- แถวหัตถการจะถูกสร้างด้วย JS -->
+              </div>
+              <button type="button" class="btn btn-secondary" onclick="addProcedureRow()">
+                เพิ่มรายการหัตถการ
+              </button>
+              <div class="alert alert-warning d-flex justify-content-between align-items-center">
+                <strong>ราคารวมทุกรายการ: </strong>
+                <span id="totalProcedurePrice">0</span>
+              </div>
+            </div>
+          </div>
+          <!-- Hidden field -->
+          <input type="hidden" id="procedures_data" name="procedures_data">
+
+          <!-- SECTION 3: Payment Details -->
+          <div class="card mb-3">
+            <div class="card-header bg-success text-white">การชำระเงิน</div>
+            <div class="card-body">
+              <!-- Deposit Rows -->
+              <div id="depositContainer">
+                <div class="row mb-3 deposit-row">
+                  <div class="col">
+                    <label class="form-label">มัดจำ (บาท)</label>
+                    <input type="number" class="form-control deposit-input"
+                           name="deposit_0" value="0" required>
+                  </div>
+                  <div class="col">
+                    <label class="form-label">มัดจำ วันที่</label>
+                    <input type="date" class="form-control" name="deposit_date_0"
+                           required>
+                  </div>
+                  <div class="col-auto align-self-end">
+                    <button type="button" class="btn btn-danger btn-sm"
+                            onclick="removeDepositRow(this)">ลบ</button>
+                  </div>
+                </div>
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm mb-3"
+                      onclick="addDepositRow()">เพิ่มมัดจำใหม่</button>
+
+              <div class="row mb-3">
+                <div class="col">
+                  <label for="cash" class="form-label">เงินสด (บาท)</label>
+                  <input type="number" class="form-control payment-input" id="cash"
+                         name="cash" value="0" required>
+                </div>
+                <div class="col">
+                  <label for="transfer" class="form-label">เงินโอน (บาท)</label>
+                  <input type="number" class="form-control payment-input" id="transfer"
+                         name="transfer" value="0" required>
+                </div>
+              </div>
+              <div class="row mb-3">
+                <div class="col">
+                  <label for="credit_card" class="form-label">รูดบัตร (บาท)</label>
+                  <input type="number" class="form-control payment-input" id="credit_card"
+                         name="credit_card" value="0" required>
+                </div>
+                <div class="col">
+                  <label for="credit_card_fee" class="form-label">ค่าธรรมเนียม (บาท)</label>
+                  <input type="number" class="form-control payment-input" id="credit_card_fee"
+                         name="credit_card_fee" value="0" required>
+                </div>
+              </div>
+              <div class="alert alert-warning d-flex justify-content-between align-items-center">
+                <div>
+                  <strong>รวมที่ต้องจ่ายทั้งหมด:</strong> 
+                  <span id="totalPayment">0</span>
+                  &nbsp;
+                  <strong>คงเหลือต้องจ่ายอีก:</strong> 
+                  <span id="remainingAmount">0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div> <!-- End modal-body -->
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            ยกเลิก
+          </button>
+          <button type="submit" class="btn btn-primary">
+            บันทึกข้อมูล
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Template for Procedure Row -->
+<template id="procedureRowTemplate">
+  <div class="procedure-row">
+    <div class="prWarningBox alert alert-info"></div>
+    <button type="button" class="btn btn-danger btn-sm remove-procedure" 
+            onclick="removeProcedureRow(this)">ลบรายการนี้</button>
+
+    <!-- หมวดหลัก -->
+    <div class="mb-3 mt-3">
+      <label class="form-label">หมวดหลัก</label>
+      <select class="form-select procedure-category" required 
+              onchange="populateProcedureNameDropdown(this)">
+        <option value="">เลือกหมวดหลัก</option>
+        <option value="SX">SX</option>
+        <option value="AES">AES</option>
+        <option value="AFC">AFC</option>
+        <option value="ค่ายาและบริการ">ค่ายาและบริการ</option>
+        <option value="อื่นๆ">อื่นๆ</option>
+      </select>
+    </div>
+
+    <!-- หมวดย่อย -->
+    <div class="mb-3">
+      <label class="form-label">หมวดย่อย</label>
+      <select class="form-select procedure-name-dropdown" required
+              onchange="populateShortCodeDropdown(this)">
+        <option value="">เลือกหมวดย่อย</option>
+      </select>
+    </div>
+
+    <!-- รหัส/หัตถการ -->
+    <div class="mb-3">
+      <label class="form-label">รหัส/หัตถการ</label>
+      <select class="form-select short-code-dropdown bg-warning text-dark" required
+              onchange="selectProcedureFromShortCodeDropdown(this)">
+        <option value="">เลือก รหัส/หัตถการ</option>
+      </select>
+    </div>
+
+    <!-- เลือกแพทย์ -->
+    <div class="mb-3">
+      <label class="form-label">แพทย์</label>
+      <select class="form-select procedure-doctor" name="procedure_doctor" required>
+        <option value="">เลือกแพทย์</option>
+        {% for doc in doctors %}
+          <option value="{{ doc.short_name }}">{{ doc.short_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- ราคา -->
+    <div class="mb-3">
+      <label class="form-label">ราคา</label>
+      <input type="number" class="form-control procedure-price" name="procedure_price" readonly>
+    </div>
+
+    <!-- PR Section -->
+    <h5>การกระจาย PR</h5>
+    <div class="row mb-3">
+      <div class="col">
+        <label class="form-label">PR Code #1</label>
+        <select class="form-select pr-code1" name="pr_code1" required>
+          <option value="">เลือก PR</option>
+          {% for user in users %}
+            {% if user.pr_code %}
+              <option value="{{ user.pr_code }}">{{ user.pr_code }}</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col">
+        <label class="form-label">ยอด #1</label>
+        <input type="number" class="form-control pr-price1"
+               name="pr_price1" required onchange="onPrChange(this)">
+      </div>
+    </div>
+    <div class="row mb-3">
+      <div class="col">
+        <label class="form-label">PR Code #2</label>
+        <select class="form-select pr-code2" name="pr_code2">
+          <option value="">เลือก PR</option>
+          {% for user in users %}
+            {% if user.pr_code %}
+              <option value="{{ user.pr_code }}">{{ user.pr_code }}</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col">
+        <label class="form-label">ยอด #2</label>
+        <input type="number" class="form-control pr-price2"
+               name="pr_price2" onchange="onPrChange(this)">
+      </div>
+    </div>
+    <div class="row mb-3">
+      <div class="col">
+        <label class="form-label">PR Code #3</label>
+        <select class="form-select pr-code3" name="pr_code3">
+          <option value="">เลือก PR</option>
+          {% for user in users %}
+            {% if user.pr_code %}
+              <option value="{{ user.pr_code }}">{{ user.pr_code }}</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col">
+        <label class="form-label">ยอด #3</label>
+        <input type="number" class="form-control pr-price3"
+               name="pr_price3" onchange="onPrChange(this)">
+      </div>
+    </div>
+
+    <!-- hidden fields -->
+    <input type="hidden" class="procedure-id" name="procedure_id">
+    <input type="hidden" class="procedure-name" name="procedure_name">
+    <input type="hidden" class="procedure-short-code" name="procedure_short_code">
+  </div>
+</template>
+
+<!-- Modal รายละเอียด -->
+<div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="detailModalLabel">รายละเอียดรายรับ</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <table class="table table-bordered" id="detailTable">
+          <thead class="custom-header">
+            <tr>
+              <th>แพทย์</th>
+              <th>หมวด</th>
+              <th>Short Code</th>
+              <th>ราคา</th>
+              <th>PR1</th>
+              <th>ยอด1</th>
+              <th>PR2</th>
+              <th>ยอด2</th>
+              <th>PR3</th>
+              <th>ยอด3</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- สร้างด้วย JS showDetailModal(...) -->
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JavaScript Section -->
+<script>
+  // =============== Data from Backend ===============
+  var allProcedures = {{ procedures|tojson }};
+  var valid_procedures = {
+    "SX": ["จมูก(ปิด)", "จมูก(โอเพ่น)", "คาง", "เหนียง", "ปาก", "Fat Graft", "ตา คิ้ว", "ดึงหน้า", "หน้าอก"],
+    "AES": ["แพ็คเกจรวม", "Botox", "Filler", "Fat", "ร้อยไหม", "ดริปวิตามิน", "งานผิว"],
+    "AFC": ["Set AFC", "ยาทารอย", "Anita", "น้ำลดบวม", "น้ำยาบ้วนปาก", "ยาหยอด", "Cool Pack"],
+    "ค่ายาและบริการ": ["ค่ายา", "ค่าโรงพยาบาล", "ตรวจแลป", "จ้างพยาบาล/ผู้ช่วย", "ทำแผล ตัดไหม"],
+    "อื่นๆ": ["ปากกาลดน้ำหนัก", "ล้างเล็บ", "อื่นๆ"]
+  };
+
+  // --------------------------------------------------
+  // 1) Search Customers (AJAX)
+  // --------------------------------------------------
+  function searchCustomers() {
+    var q = document.getElementById('customerSearchInput').value.trim();
+    var resultsArea = document.getElementById('searchResultsArea');
+    if (!q) {
+      resultsArea.innerHTML = "<div class='alert alert-info'>กรุณากรอกคำค้นหา</div>";
+      return;
+    }
+    fetch('/search_customer_for_daily_income?q=' + encodeURIComponent(q))
+      .then(res => res.json())
+      .then(data => {
+        if (data.length === 0) {
+          resultsArea.innerHTML = "<div class='alert alert-warning'>ไม่พบผลการค้นหา</div>";
+        } else {
+          let html = `
+            <table class="table table-hover table-bordered mt-3">
+              <thead>
+                <tr>
+                  <th>HN</th>
+                  <th>ชื่อ-นามสกุล</th>
+                  <th>เลือก</th>
+                </tr>
+              </thead>
+              <tbody>
+          `;
+          data.forEach(item => {
+            const fullName = item.first_name + ' ' + item.last_name;
+            html += `
+              <tr>
+                <td>${item.hn}</td>
+                <td>${fullName}</td>
+                <td>
+                  <button type="button" class="btn btn-sm btn-success"
+                    onclick="openAddModal(${item.id}, '${item.hn}', '${fullName}')">
+                    เลือก
+                  </button>
+                </td>
+              </tr>
+            `;
+          });
+          html += `</tbody></table>`;
+          resultsArea.innerHTML = html;
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        resultsArea.innerHTML = "<div class='alert alert-danger'>เกิดข้อผิดพลาดในการค้นหา</div>";
+      });
+  }
+
+  // --------------------------------------------------
+  // 2) Open Add Modal
+  // --------------------------------------------------
+  function openAddModal(customer_id, hn, full_name) {
+    document.getElementById('customer_id').value = customer_id;
+    document.getElementById('customer_info').value = hn + " - " + full_name;
+    var addModal = new bootstrap.Modal(document.getElementById('addIncomeModal'));
+    addModal.show();
+  }
+
+  // --------------------------------------------------
+  // 3) Show Detail Modal
+  // --------------------------------------------------
+  function showDetailModal(headerId, customerName) {
+    fetch('/get_daily_income_detail?header_id=' + headerId)
+      .then(response => response.json())
+      .then(data => {
+        // แสดง Detail ในตาราง (เหมือนเดิม)
+        const detailTableBody = document.querySelector("#detailTable tbody");
+        detailTableBody.innerHTML = "";
+        data.forEach(item => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${item.procedure_doctor || '-'}</td>
+            <td>${item.procedure_category || '-'}</td>
+            <td>${item.procedure_short_code || '-'}</td>
+            <td>${Number(item.procedure_price || 0).toLocaleString()}</td>
+            <td>${item.pr_code1 || '-'}</td>
+            <td>${Number(item.pr_price1 || 0).toLocaleString()}</td>
+            <td>${item.pr_code2 || '-'}</td>
+            <td>${Number(item.pr_price2 || 0).toLocaleString()}</td>
+            <td>${item.pr_code3 || '-'}</td>
+            <td>${Number(item.pr_price3 || 0).toLocaleString()}</td>
+          `;
+          detailTableBody.appendChild(tr);
+        });
+  
+        // อัปเดต title ของ Modal เพื่อบอกชื่อลูกค้า
+        const modalLabel = document.getElementById('detailModalLabel');
+        modalLabel.innerHTML = `
+          <span class="border border-primary p-2 text-primary fw-bold">
+            ${customerName}
+          </span>
+        `;
+  
+        const myModal = new bootstrap.Modal(document.getElementById('detailModal'));
+        myModal.show();
+      })
+      .catch(err => {
+        console.error("Error fetching detail:", err);
+        alert("เกิดข้อผิดพลาดในการโหลดรายละเอียด");
+      });
+  }
+
+  // --------------------------------------------------
+  // 4) Procedure Category -> Name -> ShortCode
+  // --------------------------------------------------
+  function populateProcedureNameDropdown(categorySelect) {
+    const row = categorySelect.closest(".procedure-row");
+    const category = categorySelect.value;
+
+    const nameDropdown = row.querySelector(".procedure-name-dropdown");
+    nameDropdown.innerHTML = '<option value="">เลือกชื่อหัตถการ</option>';
+
+    const shortCodeDropdown = row.querySelector(".short-code-dropdown");
+    shortCodeDropdown.innerHTML = '<option value="">เลือก Short Code</option>';
+
+    row.querySelector(".procedure-id").value = "";
+    row.querySelector(".procedure-name").value = "";
+    row.querySelector(".procedure-short-code").value = "";
+    row.querySelector(".procedure-price").value = "";
+
+    if (!category) {
+      updateTotalProcedurePrice();
+      return;
+    }
+
+    if (valid_procedures[category]) {
+      valid_procedures[category].forEach(function(nameItem) {
+        const option = document.createElement("option");
+        option.value = nameItem;
+        option.text = nameItem;
+        nameDropdown.appendChild(option);
+      });
+    }
+    updateTotalProcedurePrice();
+  }
+
+  function populateShortCodeDropdown(nameSelect) {
+    const row = nameSelect.closest(".procedure-row");
+    const category = row.querySelector(".procedure-category").value;
+    const procedureName = nameSelect.value;
+
+    const shortCodeDropdown = row.querySelector(".short-code-dropdown");
+    shortCodeDropdown.innerHTML = '<option value="">เลือก Short Code</option>';
+
+    row.querySelector(".procedure-id").value = "";
+    row.querySelector(".procedure-name").value = "";
+    row.querySelector(".procedure-short-code").value = "";
+    row.querySelector(".procedure-price").value = "";
+
+    if (!procedureName) {
+      updateTotalProcedurePrice();
+      return;
+    }
+
+    allProcedures.forEach(function(proc) {
+      if (proc.category_name === category && proc.procedure_name === procedureName) {
+        const option = document.createElement("option");
+        option.value = proc.id;
+        option.text = proc.short_code + " (" + proc.price + " บาท)";
+        option.dataset.shortCode = proc.short_code;
+        option.dataset.price = proc.price;
+        option.dataset.name = proc.procedure_name;
+        shortCodeDropdown.appendChild(option);
+      }
+    });
+    updateTotalProcedurePrice();
+  }
+
+  function selectProcedureFromShortCodeDropdown(dropdown) {
+    const row = dropdown.closest(".procedure-row");
+    const selectedOption = dropdown.options[dropdown.selectedIndex];
+
+    if (selectedOption && selectedOption.value !== "") {
+      row.querySelector(".procedure-id").value = selectedOption.value;
+      row.querySelector(".procedure-name").value = selectedOption.dataset.name;
+      row.querySelector(".procedure-short-code").value = selectedOption.dataset.shortCode;
+      row.querySelector(".procedure-price").value = selectedOption.dataset.price;
+
+      // ตั้งค่า pr_price1 = ราคาเต็ม
+      const prPrice1Field = row.querySelector(".pr-price1");
+      if (prPrice1Field) {
+        prPrice1Field.value = selectedOption.dataset.price || 0;
+      }
+    } else {
+      row.querySelector(".procedure-id").value = "";
+      row.querySelector(".procedure-name").value = "";
+      row.querySelector(".procedure-short-code").value = "";
+      row.querySelector(".procedure-price").value = "";
+      const prPrice1Field = row.querySelector(".pr-price1");
+      if (prPrice1Field) {
+        prPrice1Field.value = 0;
+      }
+    }
+    updateTotalProcedurePrice();
+  }
+
+  // --------------------------------------------------
+  // 5) Add/Remove Procedure Rows
+  // --------------------------------------------------
+  function addProcedureRow() {
+    const procedureList = document.getElementById("procedureList");
+    const template = document.getElementById("procedureRowTemplate").content.cloneNode(true);
+    procedureList.appendChild(template);
+    updateTotalProcedurePrice();
+  }
+  function removeProcedureRow(button) {
+    const procedureList = document.getElementById("procedureList");
+    if (procedureList.getElementsByClassName("procedure-row").length <= 1) {
+      alert("ต้องมีอย่างน้อย 1 หัตถการ");
+      return;
+    }
+    if (confirm("ยืนยันลบหัตถการนี้หรือไม่?")) {
+      button.closest(".procedure-row").remove();
+      updateTotalProcedurePrice();
+    }
+  }
+
+  // --------------------------------------------------
+  // 6) onPrChange -> เช็คยอด PR
+  // --------------------------------------------------
+  function onPrChange(inputElement) {
+    const row = inputElement.closest(".procedure-row");
+    const fullPrice = parseInt(row.querySelector(".procedure-price").value) || 0;
+    const pr1 = parseInt(row.querySelector(".pr-price1").value) || 0;
+    const pr2 = parseInt(row.querySelector(".pr-price2").value) || 0;
+    const pr3 = parseInt(row.querySelector(".pr-price3").value) || 0;
+    const warningBox = row.querySelector(".prWarningBox");
+
+    const sum = pr1 + pr2 + pr3;
+    if (sum > fullPrice) {
+      warningBox.classList.remove("alert-info", "alert-success");
+      warningBox.classList.add("alert-danger");
+      warningBox.innerHTML = `ยอด PR รวม (${sum}) เกินราคาเต็ม (${fullPrice})`;
+      warningBox.style.display = "block";
+    }
+    else if (sum < fullPrice) {
+      warningBox.classList.remove("alert-danger", "alert-success");
+      warningBox.classList.add("alert-info");
+      warningBox.innerHTML = `ยอด PR (${sum}) ยังน้อยกว่าราคาเต็ม (${fullPrice})`;
+      warningBox.style.display = "block";
+    }
+    else {
+      warningBox.classList.remove("alert-danger", "alert-info");
+      warningBox.classList.add("alert-success");
+      warningBox.innerHTML = `PR รวมเท่ากับราคาเต็ม (${fullPrice})`;
+      warningBox.style.display = "block";
+    }
+  }
+
+  // --------------------------------------------------
+  // 7) คำนวณราคารวม (Procedure)
+  // --------------------------------------------------
+  function updateTotalProcedurePrice() {
+    const rows = document.getElementsByClassName("procedure-row");
+    let total = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const price = parseInt(rows[i].querySelector(".procedure-price").value) || 0;
+      total += price;
+    }
+    document.getElementById("totalProcedurePrice").innerText = total;
+    updateTotalPaymentDisplay();
+  }
+
+  // --------------------------------------------------
+  // 8) อัปเดตยอด Payment และ Remaining
+  // --------------------------------------------------
+  function updateTotalPaymentDisplay() {
+    const depositInputs = document.getElementsByClassName("deposit-input");
+    let totalDeposit = 0;
+    for (let i = 0; i < depositInputs.length; i++) {
+      totalDeposit += parseInt(depositInputs[i].value) || 0;
+    }
+    const cash = parseInt(document.getElementById("cash").value) || 0;
+    const transfer = parseInt(document.getElementById("transfer").value) || 0;
+    const credit_card = parseInt(document.getElementById("credit_card").value) || 0;
+
+    const totalPayment = totalDeposit + cash + transfer + credit_card;
+    document.getElementById("totalPayment").innerText = totalPayment.toLocaleString("en-US");
+
+    const totalProcPrice = parseInt(document.getElementById("totalProcedurePrice").innerText) || 0;
+    const remaining = totalProcPrice - totalPayment;
+    document.getElementById("remainingAmount").innerText = remaining.toLocaleString("en-US");
+  }
+
+  // เพิ่ม listener ให้ payment inputs
+  const paymentInputs = document.getElementsByClassName("payment-input");
+  for (let i = 0; i < paymentInputs.length; i++) {
+    paymentInputs[i].addEventListener("input", updateTotalPaymentDisplay);
+  }
+
+  // --------------------------------------------------
+  // 9) Deposit Rows (Add/Remove)
+  // --------------------------------------------------
+  function addDepositRow() {
+    const depositContainer = document.getElementById("depositContainer");
+    const rowCount = depositContainer.getElementsByClassName("deposit-row").length;
+    const newRow = document.createElement("div");
+    newRow.className = "row mb-3 deposit-row";
+    newRow.innerHTML = `
+      <div class="col">
+        <label class="form-label">มัดจำ (บาท)</label>
+        <input type="number" class="form-control deposit-input"
+               name="deposit_${rowCount}" value="0" required>
+      </div>
+      <div class="col">
+        <label class="form-label">มัดจำ วันที่</label>
+        <input type="date" class="form-control" name="deposit_date_${rowCount}" required>
+      </div>
+      <div class="col-auto align-self-end">
+        <button type="button" class="btn btn-danger btn-sm"
+                onclick="removeDepositRow(this)">ลบ</button>
+      </div>
+    `;
+    depositContainer.appendChild(newRow);
+    // ให้ row ใหม่นี้ updatePayment ได้
+    newRow.querySelector(".deposit-input").addEventListener("input", updateTotalPaymentDisplay);
+  }
+  function removeDepositRow(button) {
+    const depositContainer = document.getElementById("depositContainer");
+    if (depositContainer.getElementsByClassName("deposit-row").length <= 1) {
+      alert("ต้องมีอย่างน้อย 1 มัดจำ");
+      return;
+    }
+    if (confirm("ยืนยันลบมัดจำนี้?")) {
+      button.closest(".deposit-row").remove();
+      updateTotalPaymentDisplay();
+    }
+  }
+
+  // --------------------------------------------------
+  // 10) ก่อน submit -> รวมค่า procedures เป็น JSON และ validate
+  // --------------------------------------------------
+  function prepareProceduresData() {
+    // 10.1) รวมค่า Procedures
+    const procedureList = document.getElementById("procedureList");
+    const rows = procedureList.getElementsByClassName("procedure-row");
+    let proceduresArray = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const procedureData = {
+        procedure_category: row.querySelector('.procedure-category').value,
+        procedure_doctor: row.querySelector('.procedure-doctor').value,
+        procedure_id: row.querySelector('.procedure-id').value,
+        procedure_name: row.querySelector('.procedure-name').value,
+        procedure_short_code: row.querySelector('.procedure-short-code').value,
+        procedure_price: row.querySelector('.procedure-price').value,
+        pr_code1: row.querySelector('.pr-code1').value,
+        pr_price1: row.querySelector('.pr-price1').value,
+        pr_code2: row.querySelector('.pr-code2').value,
+        pr_price2: row.querySelector('.pr-price2').value,
+        pr_code3: row.querySelector('.pr-code3').value,
+        pr_price3: row.querySelector('.pr-price3').value
+      };
+      proceduresArray.push(procedureData);
+    }
+    document.getElementById("procedures_data").value = JSON.stringify(proceduresArray);
+
+    // 10.2) เช็คยอด (Front-end) ถ้าต้องการ
+    const totalProcPrice = parseInt(document.getElementById("totalProcedurePrice").innerText) || 0;
+    let depositSum = 0;
+    const depositInputs = document.getElementsByClassName("deposit-input");
+    for (let i = 0; i < depositInputs.length; i++) {
+      depositSum += parseInt(depositInputs[i].value) || 0;
+    }
+    const cash = parseInt(document.getElementById("cash").value) || 0;
+    const transfer = parseInt(document.getElementById("transfer").value) || 0;
+    const credit_card = parseInt(document.getElementById("credit_card").value) || 0;
+    const totalPayment = depositSum + cash + transfer + credit_card;
+    
+    if (totalProcPrice !== totalPayment) {
+      alert(`ยอดชำระ (${totalPayment}) ไม่เท่ากับราคาหัตถการ (${totalProcPrice}) กรุณาตรวจสอบ`);
+      return false; // ไม่ submit
+    }
+    // Confirm
+    if (!confirm("ยืนยันบันทึกข้อมูล?")) {
+      return false;
+    }
+    return true;
+  }
+
+  // --------------------------------------------------
+  // 11) onload -> auto addProcedureRow() ถ้าไม่มี
+  // --------------------------------------------------
+  window.onload = function() {
+    const procedureList = document.getElementById("procedureList");
+    if (procedureList && procedureList.getElementsByClassName("procedure-row").length === 0) {
+      addProcedureRow();
+    }
+  };
+</script>
+
+<!-- Bootstrap Bundle JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

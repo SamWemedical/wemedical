@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>Admin Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background-color: #f9f9f9;
+    }
+    .dashboard-container {
+      max-width: 900px;
+      margin: 40px auto;
+    }
+    .card-header {
+      background-color: #767d85;
+      color: #fff;
+    }
+    .card-top {
+      background-color: #41464b;
+      color: #fff;
+    }
+    .badge-notification {
+      background-color: #dc3545;
+      color: #fff;
+      font-size: 0.8em;
+      vertical-align: top;
+      padding: 0.2em 0.4em;
+      border-radius: 10px;
+    }
+    .list-group-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .list-group-item a {
+      text-decoration: none;
+      color: inherit;
+    }
+    .list-group-item a:hover {
+      color: #007bff;
+      text-decoration: underline;
+    }
+    .fw-bold {
+      font-weight: bold;
+    }
+    .bg-light {
+      background-color: #f8f9fa !important;
+    }
+  </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+  <div class="card shadow">
+    <div class="card-header">
+      <h3 class="m-0">Admin Dashboard</h3>
+    </div>
+    <div class="card-body">
+
+      <ul class="list-group mb-3">
+        <!-- หมวดหมู่: การจัดการผู้ใช้ -->
+        <li class="list-group-item card-top text-white fw-bold">User Management</li>
+        <li class="list-group-item"><a href="/admin/manage_users">Manage Users (Add,Delete)</a></li>
+        <li class="list-group-item"><a href="/admin/add_subcategory">เพิ่ม Subcategories</a></li>
+        <li class="list-group-item"><a href="/admin/manage_subcat_access">Subcat Access</a></li>
+        <li class="list-group-item"><a href="/user/user_list">Users Details</a></li>
+        <li class="list-group-item"><a href="/hr/manage_pr_codes">แก้ไขรหัส PR</a></li>
+        <li class="list-group-item"><a href="/admin/change_code">Join Code</a></li>
+        <li class="list-group-item"><a href="/admin/workflow_config">Workflow Config</a></li>
+        <li class="list-group-item"><a href="/doctor_database">Doctors</a></li>
+        <li class="list-group-item"><a href="/procedures">Procedures</a></li>
+        <li class="list-group-item"><a href="/admin/commission_users">Commision Rate</a></li>
+        <li class="list-group-item"><a href="/incentive_users">ตั้งค่า Incentive</a></li>
+        <li class="list-group-item"><a href="/aes_commission_rate">ตั้งค่ามือ AES</a></li>
+
+        <!-- หมวดหมู่: เงินเดือนและสวัสดิการ -->
+        <li class="list-group-item card-top text-white fw-bold">Salary & Payslip</li>
+        <li class="list-group-item"><a href="/admin/salary_overview">[Salary] Overview</a></li>
+        <li class="list-group-item"><a href="/hr/salary_setup">[Salary] Setup</a></li>
+        <li class="list-group-item"><a href="/hr/insurance_fund_add">[Insurance] Setup</a></li>
+        <li class="list-group-item"><a href="/hr/edit_insurance_config">[Insurance] Monthly Deduction</a></li>
+        <li class="list-group-item"><a href="/hr/insurance_fund_form">[Insurance] History</a></li>
+        <li class="list-group-item"><a href="/hr/payday_config" class="menu-title">แก้ไขวันที่ สลิปเงินเดือน และค่าคอมฯ</a></li>
+        <li class="list-group-item"><a href="/translate_commission">(PA) แปลบทความ</a></li>
+        <li class="list-group-item"><a href="/aes_commission">(OR) บันทึกค่ามือ AES รายวัน</a></li>
+        <li class="list-group-item"><a href="/credit_commission">(MKT) เครดิต</a></li>
+
+        <!-- หมวดหมู่: สรุปยอดรายเดือน -->
+        <li class="list-group-item card-top text-white fw-bold">Summary</li>
+        <li class="list-group-item"><a href="/daily_income">Daily Income</a></li>
+        <li class="list-group-item"><a href="/admin/monthly_sales">สรุปยอด PR รายเดือน</a></li>
+        <li class="list-group-item"><a href="/admin/monthly_sales_details">สรุปยอด PR รายเดือน (ละเอียด)</a></li>
+        <li class="list-group-item"><a href="/payroll_summary_all">Payroll Summary</a></li>
+        <li class="list-group-item"><a href="/hr/summary_form2">มาสาย + OT</a></li>
+
+        <!-- หมวดหมู่: การจัดการคนไข้ -->
+        <li class="list-group-item card-top text-white fw-bold">Patient Management</li>
+        <li class="list-group-item"><a href="/customer_list">ดูรายชื่อคนไข้</a></li>
+
+        <!-- หมวดหมู่: ส่วนตัว -->
+        <li class="list-group-item card-top text-white fw-bold">Personal</li>
+        <li class="list-group-item">
+          <a href="/my_notifications">Notifications</a>
+          {% if unread_notifications > 0 %}
+            <span class="badge-notification">{{ unread_notifications }}</span>
+          {% endif %}
+        </li>
+        <li class="list-group-item"><a href="/user/change_password">Change Password</a></li>
+      </ul>
+
+      <div class="text-end">
+        <a href="/logout" class="btn btn-danger">Logout</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

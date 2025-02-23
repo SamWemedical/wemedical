@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>ยืนยันการยกเลิกคำขอลา</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container mt-5">
+  <h1 class="text-danger">ยืนยันการยกเลิกคำขอลา</h1>
+  <p>คุณต้องการยกเลิกคำขอลานี้หรือไม่?</p>
+  <ul>
+    <li><strong>ประเภทการลา:</strong> {{ leave.leave_type }}</li>
+    <li><strong>วันเริ่มต้น:</strong> {{ leave.start_date }}</li>
+    <li><strong>วันสิ้นสุด:</strong> {{ leave.end_date }}</li>
+    <li><strong>เหตุผล:</strong> {{ leave.reason }}</li>
+  </ul>
+  <form method="POST" action="/cancel_leave_request/{{ leave.leave_id }}">
+    <button type="submit" class="btn btn-danger">ยืนยันการยกเลิก</button>
+    <a href="/my_leave_requests" class="btn btn-secondary">ย้อนกลับ</a>
+  </form>
+</div>
+</body>
+</html>

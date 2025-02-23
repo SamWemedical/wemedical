@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>อนุมัติผ่านโปร (Probation)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f9f9f9;
+      font-family: "Sarabun", sans-serif;
+    }
+    .container {
+      max-width: 900px;
+      margin: 40px auto;
+    }
+    .card {
+      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+      margin-bottom: 20px;
+    }
+    .card-header {
+      background-color: #6610f2;
+      color: #fff;
+      text-align: center;
+      padding: 12px;
+    }
+    .table th, .table td {
+      text-align: center;
+      vertical-align: middle;
+    }
+    .btn-approve {
+      background-color: #0d6efd;
+      color: #fff;
+      border: none;
+    }
+    .btn-approve:hover {
+      background-color: #0b5ed7;
+    }
+    .group-title {
+      background-color: #e9ecef;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-weight: bold;
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+    .btn-group-bottom {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, msg in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <!-- Pending Approvals Section -->
+  <div class="card shadow">
+    <div class="card-header">
+      <h4 class="m-0">พนักงานรออนุมัติผ่านโปร</h4>
+    </div>
+    <div class="card-body">
+      {% if pending_users|length == 0 %}
+        <div class="alert alert-info">ไม่มีพนักงานที่รออนุมัติผ่านโปร</div>
+      {% else %}
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+          <thead class="table-secondary">
+            <tr>
+              <th>#</th>
+              <th>ชื่อ-นามสกุล</th>
+              <th>ตำแหน่ง</th>
+              <th>การดำเนินการ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in pending_users %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ user.first_name }} {{ user.last_name }}</td>
+              <td>{{ user.role }}</td>
+              <td>
+                <form method="POST" style="display:inline;" onsubmit="return confirm('ต้องการอนุมัติผ่านโปรให้ {{ user.first_name }} {{ user.last_name }} หรือไม่?');">
+                  <input type="hidden" name="user_id" value="{{ user.user_id }}">
+                  <button type="submit" class="btn btn-sm btn-approve">อนุมัติผ่านโปร</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- All Employees Section -->
+  <div class="card shadow">
+    <div class="card-header">
+      <h4 class="m-0">รายชื่อพนักงานทั้งหมด</h4>
+    </div>
+    <div class="card-body">
+      <!-- Group: พนักงานทดลองงาน -->
+      <div class="group-title text-danger">พนักงานทดลองงาน</div>
+      {% if trial_users|length == 0 %}
+        <div class="alert alert-info">ไม่มีพนักงานทดลองงาน</div>
+      {% else %}
+      <div class="table-responsive mb-3">
+        <table class="table table-bordered table-hover align-middle">
+          <thead class="table-secondary">
+            <tr>
+              <th>#</th>
+              <th>ชื่อ-นามสกุล</th>
+              <th>ตำแหน่ง</th>
+              <th>สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in trial_users %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ u.first_name }} {{ u.last_name }}</td>
+              <td>{{ u.role }}</td>
+              <td>พนักงานทดลองงาน</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      <!-- Group: พนักงานประจำ -->
+      <div class="group-title text-success">พนักงานประจำ</div>
+      {% if permanent_users|length == 0 %}
+        <div class="alert alert-info">ไม่มีพนักงานประจำ</div>
+      {% else %}
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+          <thead class="table-secondary">
+            <tr>
+              <th>#</th>
+              <th>ชื่อ-นามสกุล</th>
+              <th>ตำแหน่ง</th>
+              <th>สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in permanent_users %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ u.first_name }} {{ u.last_name }}</td>
+              <td>{{ u.role }}</td>
+              <td>พนักงานประจำ</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- กลุ่มปุ่มนำทางด้านล่าง -->
+  <div class="btn-group-bottom">
+    <a href="/hr" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

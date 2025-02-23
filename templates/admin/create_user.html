@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>สร้างผู้ใช้ (Admin)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background-color: #f9f9f9;
+    }
+    .container {
+      max-width: 600px;
+      margin: 40px auto;
+    }
+    .card-header {
+      background-color: #007bff;
+      color: #fff;
+    }
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    .btn-primary {
+      background-color: #007bff;
+      border: none;
+    }
+    .btn-secondary {
+      background-color: #6c757d;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="card shadow">
+    <div class="card-header">
+      <h3 class="m-0">สร้างผู้ใช้ใหม่</h3>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('create_user') }}">
+
+        <!-- ชื่อผู้ใช้ -->
+        <div class="form-group">
+          <label for="username" class="form-label">ชื่อผู้ใช้ (Username)</label>
+          <input type="text" class="form-control" id="username" name="username" required>
+        </div>
+
+        <!-- รหัสผ่าน -->
+        <div class="form-group">
+          <label for="password" class="form-label">รหัสผ่าน (Password)</label>
+          <input type="password" class="form-control" id="password" name="password" required>
+        </div>
+
+        <!-- ตำแหน่ง (Role) -->
+        <div class="form-group">
+          <label for="role_id" class="form-label">ตำแหน่ง (Role)</label>
+          <select class="form-select" id="role_id" name="role_id" required onchange="loadSubcategories()">
+            <option value="" disabled selected>-- เลือก Role --</option>
+            {% for role in roles %}
+              <!-- เก็บ role_id เป็น value -->
+              <option value="{{ role.role_id }}">{{ role.role_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- แผนก (Subcategory) -->
+        <div class="form-group">
+          <label for="sub_category_id" class="form-label">แผนก (Subcategory)</label>
+          <select class="form-select" id="sub_category_id" name="sub_category_id" required>
+            <option value="" disabled selected>-- กรุณาเลือก Role ก่อน --</option>
+          </select>
+        </div>
+
+        <!-- ชื่อจริง -->
+        <div class="form-group">
+          <label for="first_name" class="form-label">ชื่อจริง (First Name)</label>
+          <input type="text" class="form-control" id="first_name" name="first_name" required>
+        </div>
+
+        <!-- นามสกุล -->
+        <div class="form-group">
+          <label for="last_name" class="form-label">นามสกุล (Last Name)</label>
+          <input type="text" class="form-control" id="last_name" name="last_name" required>
+        </div>
+
+        <!-- ปุ่ม -->
+        <div class="d-flex justify-content-between mt-4">
+          <button type="submit" class="btn btn-primary">สร้างผู้ใช้</button>
+          <a href="{{ url_for('manage_users') }}" class="btn btn-secondary">กลับ</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- JavaScript -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function loadSubcategories() {
+  // ดึง role_id จาก dropdown
+  const roleId = document.getElementById('role_id').value;
+
+  // ถ้า user ยังไม่เลือก role (value == ""), return ออกไป
+  if(!roleId) {
+    return;
+  }
+
+  // เรียก AJAX ไปที่ /admin/get_subcategories/<role_id>
+  fetch(`/admin/get_subcategories/${roleId}`)
+    .then(response => response.json())
+    .then(data => {
+      const subcatSelect = document.getElementById('sub_category_id');
+      // เคลียร์ option เก่า
+      subcatSelect.innerHTML = '<option value="" disabled selected>-- เลือก Subcategory --</option>';
+
+      // เติม option ใหม่
+      data.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.id;   // sub_category_id
+        option.textContent = item.name;  // sub_category_name
+        subcatSelect.appendChild(option);
+      });
+    })
+    .catch(err => {
+      console.error('Error fetching subcategories:', err);
+    });
+}
+</script>
+</body>
+</html>

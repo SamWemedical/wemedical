@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>ลงทะเบียนฐานข้อมูลลูกค้า</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f9f9f9; }
+    .container { max-width: 900px; margin: 40px auto; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h2 class="mb-4">ลงทะเบียนคนไข้ (ภาษาไทย)</h2>
+  <h6 class="mb-4">*กรุณากรอกข้อมูลให้ครบทุกช่อง*</h6>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <!-- ฟอร์มหลัก -->
+  <form method="POST" id="customerForm">
+    <!-- คำนำหน้า -->
+    <div class="mb-3">
+      <label for="prefix" class="form-label">คำนำหน้า</label>
+      <select class="form-select" id="prefix" name="prefix" required>
+        <option value="">เลือกคำนำหน้า</option>
+        <option value="นาย">นาย</option>
+        <option value="นาง">นาง</option>
+        <option value="นางสาว">นางสาว</option>
+      </select>
+    </div>
+
+    <!-- ชื่อ -->
+    <div class="mb-3">
+      <label for="first_name" class="form-label">ชื่อ</label>
+      <input type="text" class="form-control" id="first_name" name="first_name" placeholder="ชื่อจริง" required>
+    </div>
+
+    <!-- นามสกุล -->
+    <div class="mb-3">
+      <label for="last_name" class="form-label">นามสกุล</label>
+      <input type="text" class="form-control" id="last_name" name="last_name" placeholder="นามสกุล" required>
+    </div>
+
+    <!-- ชื่อเล่น -->
+    <div class="mb-3">
+      <label for="nickname" class="form-label">ชื่อเล่น</label>
+      <input type="text" class="form-control" id="nickname" name="nickname" placeholder="ชื่อเล่น" required>
+    </div>
+
+    <!-- เบอร์โทรศัพท์ -->
+    <div class="mb-3">
+      <label for="phone" class="form-label">เบอร์โทรศัพท์</label>
+      <div class="input-group">
+        <select class="form-select" id="country_code" name="country_code" required style="max-width: 200px;">
+          <option value="+66">+66 (ไทย)</option>
+          <option value="+62">+62 (Indonesia)</option>
+          <option value="+60">+60 (Malasia)</option>
+          <option value="+65">+65 (Singapore)</option>
+          <option value="+95">+95 (Myanmar)</option>
+          <option value="+856">+856 (Laos)</option>
+          <option value="+855">+855 (Cambodia)</option>
+          <option value="+1">+1 (USA)</option>
+          <option value="+44">+44 (UK)</option>
+          <option value="+61">+61 (Australia)</option>
+          <option value="+81">+81 (Japan)</option>
+          <option value="+86">+86 (China)</option>
+          <option value="+49">+49 (Germany)</option>
+          <option value="+33">+33 (France)</option>
+          <option value="+91">+91 (India)</option>
+          <option value="other">อื่นๆ</option>
+        </select>
+        <input type="text" class="form-control" id="custom_country_code" name="custom_country_code" 
+              placeholder="ระบุรหัสประเทศ (ไม่ต้องใส่ +)" style="display: none; max-width: 200px;">
+        <input type="tel" class="form-control" id="phone" name="phone" placeholder="กรุณากรอกเบอร์โทรศัพท์" required>
+      </div>
+    </div>
+
+    <script>
+      document.getElementById('country_code').addEventListener('change', function(){
+        var selectedValue = this.value;
+        var customInput = document.getElementById('custom_country_code');
+        if (selectedValue === "other") {
+          customInput.style.display = "block";
+          customInput.setAttribute("required", "required");
+        } else {
+          customInput.style.display = "none";
+          customInput.removeAttribute("required");
+        }
+      });
+    </script>
+
+    <!-- เลขบัตรประจำตัวประชาชน -->
+    <div class="mb-3">
+      <label for="id_value" class="form-label">เลขบัตรประจำตัวประชาชน</label>
+      <input type="text" class="form-control mt-2" id="id_value" name="id_value" 
+            placeholder="กรุณากรอกเลขบัตรประจำตัวประชาชน 13 หลัก" 
+            required pattern="^[0-9]{13}$">
+    </div>
+
+    <script>
+      var inputField = document.getElementById('id_value');
+      inputField.setAttribute('pattern', '^[0-9]{13}$');
+      inputField.setAttribute('placeholder', 'กรุณากรอกเลขบัตรประจำตัวประชาชน 13 หลัก');
+      inputField.setAttribute('required', 'required');
+    </script>
+
+    <!-- วันเกิด -->
+    <div class="mb-3">
+      <label for="birthday" class="form-label">วันเกิด</label>
+      <input type="date" class="form-control" id="birthday" name="birthday" required>
+    </div>
+
+    <!-- สัญชาติ -->
+    <div class="mb-3">
+      <label for="nationality" class="form-label">สัญชาติ</label>
+      <select class="form-select" id="nationality" name="nationality" required>
+        <option value="">เลือกสัญชาติ</option>
+        <option value="ไทย">ไทย</option>
+        <option value="อื่นๆ">อื่นๆ</option>
+      </select>
+    </div>
+
+    <div class="mb-3" id="otherNationalityContainer" style="display: none;">
+      <label for="nationality_other" class="form-label">โปรดระบุสัญชาติ</label>
+      <input type="text" class="form-control" id="nationality_other" name="nationality_other" placeholder="ระบุสัญชาติ">
+    </div>
+
+    <script>
+      document.getElementById('nationality').addEventListener('change', function() {
+        var selected = this.value;
+        var container = document.getElementById('otherNationalityContainer');
+        var inputOther = document.getElementById('nationality_other');
+        if (selected === 'อื่นๆ') {
+          container.style.display = 'block';
+          inputOther.setAttribute('required', 'required');
+        } else {
+          container.style.display = 'none';
+          inputOther.removeAttribute('required');
+        }
+      });
+    </script>
+
+    <!-- ที่อยู่/โรงแรม -->
+    <div class="mb-3">
+      <label for="address" class="form-label">ที่อยู่/โรงแรม</label>
+      <textarea class="form-control" id="address" name="address" rows="2" required></textarea>
+    </div>
+
+    <!-- อาชีพ -->
+    <div class="mb-3">
+      <label for="occupation" class="form-label">อาชีพ</label>
+      <input type="text" class="form-control" id="occupation" name="occupation" required>
+    </div>
+
+    <!-- บุคคลติดต่อกรณีฉุกเฉิน -->
+    <div class="mb-3">
+      <label for="emergency_contact" class="form-label">ชื่อบุคคลติดต่อกรณีฉุกเฉิน</label>
+      <input type="text" class="form-control" id="emergency_contact" name="emergency_contact" required>
+    </div>
+
+    <!-- ความเกี่ยวข้องของบุคคลติดต่อ -->
+    <div class="mb-3">
+      <label for="emergency_relationship" class="form-label">ความเกี่ยวข้องของบุคคลติดต่อ</label>
+      <input type="text" class="form-control" id="emergency_relationship" name="emergency_relationship" required>
+    </div>
+
+    <!-- เบอร์ติดต่อฉุกเฉิน -->
+    <div class="mb-3">
+      <label for="emergency_phone" class="form-label">เบอร์ติดต่อฉุกเฉิน</label>
+      <input type="tel" class="form-control" id="emergency_phone" name="emergency_phone" required>
+    </div>
+
+    <!-- ประวัติแพ้ยา -->
+    <div class="mb-3">
+      <label class="form-label">ประวัติแพ้ยา</label>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="drug_allergy_history_choice" id="drug_allergy_none" value="ไม่มี" checked>
+        <label class="form-check-label" for="drug_allergy_none">ไม่มี</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="drug_allergy_history_choice" id="drug_allergy_yes" value="มี">
+        <label class="form-check-label" for="drug_allergy_yes">มี</label>
+      </div>
+      <div class="mt-2" id="drugAllergyDetailsContainer" style="display: none;">
+        <input type="text" class="form-control mb-2" id="drug_allergy_details" name="drug_allergy_details" placeholder="โปรดระบุประวัติแพ้ยา">
+        <input type="text" class="form-control" id="drug_allergy_symptoms" name="drug_allergy_symptoms" placeholder="โปรดระบุอาการที่แพ้">
+      </div>
+    </div>
+    <script>
+      document.getElementById('drug_allergy_yes').addEventListener('change', function() {
+        var container = document.getElementById('drugAllergyDetailsContainer');
+        container.style.display = 'block';
+        document.getElementById('drug_allergy_details').setAttribute('required', 'required');
+        document.getElementById('drug_allergy_symptoms').setAttribute('required', 'required');
+      });
+      document.getElementById('drug_allergy_none').addEventListener('change', function() {
+        var container = document.getElementById('drugAllergyDetailsContainer');
+        container.style.display = 'none';
+        document.getElementById('drug_allergy_details').removeAttribute('required');
+        document.getElementById('drug_allergy_symptoms').removeAttribute('required');
+      });
+    </script>
+
+    <!-- โรคประจำตัว -->
+    <div class="mb-3">
+      <label class="form-label">โรคประจำตัว</label>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="chronic_disease_choice" id="disease_none" value="ไม่มี" checked>
+        <label class="form-check-label" for="disease_none">ไม่มี</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="chronic_disease_choice" id="disease_yes" value="มี">
+        <label class="form-check-label" for="disease_yes">มี</label>
+      </div>
+      <div class="mt-2" id="chronicDiseaseDetailsContainer" style="display: none;">
+        <input type="text" class="form-control" id="chronic_disease_details" name="chronic_disease_details" placeholder="โปรดระบุโรคประจำตัว">
+      </div>
+    </div>
+    <script>
+      document.getElementById('disease_yes').addEventListener('change', function() {
+        var container = document.getElementById('chronicDiseaseDetailsContainer');
+        container.style.display = 'block';
+        document.getElementById('chronic_disease_details').setAttribute('required', 'required');
+      });
+      document.getElementById('disease_none').addEventListener('change', function() {
+        var container = document.getElementById('chronicDiseaseDetailsContainer');
+        container.style.display = 'none';
+        document.getElementById('chronic_disease_details').removeAttribute('required');
+      });
+    </script>
+
+    <!-- ยาที่ใช้อยู่ในปัจจุบัน -->
+    <div class="mb-3">
+      <label class="form-label">ยาที่ใช้อยู่ในปัจจุบัน</label>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="current_medications_choice" id="med_none" value="ไม่มี" checked>
+        <label class="form-check-label" for="med_none">ไม่มี</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="current_medications_choice" id="med_yes" value="มี">
+        <label class="form-check-label" for="med_yes">มี</label>
+      </div>
+      <div class="mt-2" id="medicationsDetailsContainer" style="display: none;">
+        <input type="text" class="form-control" id="current_medications_details" name="current_medications_details" placeholder="กรุณาระบุยาที่ใช้อยู่">
+      </div>
+    </div>
+    <script>
+      document.getElementById('med_yes').addEventListener('change', function() {
+        var container = document.getElementById('medicationsDetailsContainer');
+        var textbox = document.getElementById('current_medications_details');
+        container.style.display = 'block';
+        textbox.setAttribute('required', 'required');
+      });
+      document.getElementById('med_none').addEventListener('change', function() {
+        var container = document.getElementById('medicationsDetailsContainer');
+        var textbox = document.getElementById('current_medications_details');
+        container.style.display = 'none';
+        textbox.removeAttribute('required');
+      });
+    </script>
+
+    <!-- SX ที่เคยทำ -->
+    <div class="mb-3">
+      <label class="form-label">ศัลยกรรมที่เคยทำมาก่อน</label>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="surgery_experience_choice" id="surgery_never" value="ไม่เคย" checked>
+        <label class="form-check-label" for="surgery_never">ไม่เคยทำ</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="surgery_experience_choice" id="surgery_ever" value="เคย">
+        <label class="form-check-label" for="surgery_ever">เคยทำ (เลือกได้มากกว่า 1 ข้อ)</label>
+      </div>
+      <div id="surgeryChoicesContainer" style="display: none; margin-top: 10px;">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_nose" name="previous_surgeries" value="จมูก">
+          <label class="form-check-label" for="surgery_nose">จมูก</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_chin" name="previous_surgeries" value="คาง">
+          <label class="form-check-label" for="surgery_chin">คาง</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_mouth" name="previous_surgeries" value="ปาก">
+          <label class="form-check-label" for="surgery_mouth">ปาก</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_eyes" name="previous_surgeries" value="ตา">
+          <label class="form-check-label" for="surgery_eyes">ตา</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_browlift" name="previous_surgeries" value="คิ้ว">
+          <label class="form-check-label" for="surgery_browlift">คิ้ว</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_facelift" name="previous_surgeries" value="ดึงหน้า">
+          <label class="form-check-label" for="surgery_facelift">ดึงหน้า</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_breast" name="previous_surgeries" value="หน้าอก">
+          <label class="form-check-label" for="surgery_breast">หน้าอก</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_liposuction" name="previous_surgeries" value="ดูดไขมัน">
+          <label class="form-check-label" for="surgery_liposuction">ดูดไขมัน</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_fattransfer" name="previous_surgeries" value="Fat Graft">
+          <label class="form-check-label" for="surgery_fattransfer">Fat Graft</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_other" name="previous_surgeries" value="อื่นๆ">
+          <label class="form-check-label" for="surgery_other">อื่นๆ</label>
+        </div>
+        <div class="mt-2" id="otherSurgeryTextboxContainer" style="display: none;">
+          <input type="text" class="form-control" id="surgery_other_text" name="surgery_other_text" placeholder="โปรดระบุ">
+        </div>
+      </div>
+    </div>
+    <script>
+      document.getElementById('surgery_never').addEventListener('change', function() {
+        if (this.checked) {
+          document.getElementById('surgeryChoicesContainer').style.display = 'none';
+          var checkboxes = document.querySelectorAll('#surgeryChoicesContainer input[type="checkbox"]');
+          checkboxes.forEach(cb => cb.checked = false);
+          document.getElementById('otherSurgeryTextboxContainer').style.display = 'none';
+          document.getElementById('surgery_other_text').removeAttribute('required');
+        }
+      });
+      document.getElementById('surgery_ever').addEventListener('change', function() {
+        if (this.checked) {
+          document.getElementById('surgeryChoicesContainer').style.display = 'block';
+        }
+      });
+      document.getElementById('surgery_other').addEventListener('change', function() {
+        var textboxContainer = document.getElementById('otherSurgeryTextboxContainer');
+        var textbox = document.getElementById('surgery_other_text');
+        if (this.checked) {
+          textboxContainer.style.display = 'block';
+          textbox.setAttribute('required', 'required');
+        } else {
+          textboxContainer.style.display = 'none';
+          textbox.removeAttribute('required');
+        }
+      });
+    </script>
+
+    <!-- ช่องทางที่รู้จักคลินิกของเรา -->
+    <div class="mb-3">
+      <label class="form-label">ช่องทางที่รู้จัก WE clinic (เลือกได้มากกว่า 1 ข้อ)</label>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="referral_facebook" name="referral_channel" value="Facebook">
+        <label class="form-check-label" for="referral_facebook">Facebook</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="referral_line" name="referral_channel" value="Line">
+        <label class="form-check-label" for="referral_line">Line</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="referral_instagram" name="referral_channel" value="Instagram">
+        <label class="form-check-label" for="referral_instagram">Instagram</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="referral_tiktok" name="referral_channel" value="TikTok">
+        <label class="form-check-label" for="referral_tiktok">TikTok</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="referral_friend" name="referral_channel" value="เพื่อน/ญาติแนะนำ">
+        <label class="form-check-label" for="referral_friend">เพื่อน/ญาติแนะนำ</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="referral_other" name="referral_channel" value="อื่นๆ">
+        <label class="form-check-label" for="referral_other">อื่นๆ</label>
+      </div>
+      <div class="mt-2" id="otherReferralContainer" style="display: none;">
+        <input type="text" class="form-control" id="referral_other_text" name="referral_other_text" placeholder="โปรดระบุ">
+      </div>
+    </div>
+    <script>
+      document.getElementById('referral_other').addEventListener('change', function() {
+        var otherContainer = document.getElementById('otherReferralContainer');
+        var otherText = document.getElementById('referral_other_text');
+        if (this.checked) {
+          otherContainer.style.display = 'block';
+          otherText.setAttribute('required', 'required');
+        } else {
+          otherContainer.style.display = 'none';
+          otherText.removeAttribute('required');
+        }
+      });
+    </script>
+
+    <!-- เหตุผลที่เลือกคลินิกของเรา -->
+    <div class="mb-3">
+      <label class="form-label">เหตุผลที่เลือก WE clinic (เลือกได้มากกว่า 1 ข้อ)</label>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_reputation" name="reason_to_choose_clinic" value="ชื่อเสียงของคลินิก">
+        <label class="form-check-label" for="reason_reputation">ชื่อเสียงของคลินิก</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_doctor_skill" name="reason_to_choose_clinic" value="ฝีมือแพทย์">
+        <label class="form-check-label" for="reason_doctor_skill">ฝีมือแพทย์</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_shape" name="reason_to_choose_clinic" value="รูปทรงถูกใจ">
+        <label class="form-check-label" for="reason_shape">รูปทรงถูกใจ</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_price" name="reason_to_choose_clinic" value="ราคาสมเหตุสมผล">
+        <label class="form-check-label" for="reason_price">ราคาสมเหตุสมผล</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_advertising" name="reason_to_choose_clinic" value="เห็นสื่อโฆษณา">
+        <label class="form-check-label" for="reason_advertising">เห็นสื่อโฆษณา</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_location" name="reason_to_choose_clinic" value="สะดวกในการเดินทาง">
+        <label class="form-check-label" for="reason_location">สะดวกในการเดินทาง</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_service" name="reason_to_choose_clinic" value="การบริการของพนักงาน">
+        <label class="form-check-label" for="reason_service">การบริการของพนักงาน</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_other" name="reason_to_choose_clinic" value="อื่นๆ">
+        <label class="form-check-label" for="reason_other">อื่นๆ (โปรดระบุ)</label>
+      </div>
+      <div class="mt-2" id="otherReasonContainer" style="display: none;">
+        <input type="text" class="form-control" id="reason_other_text" name="reason_other_text" placeholder="โปรดระบุเหตุผล">
+      </div>
+    </div>
+    <script>
+      document.getElementById('reason_other').addEventListener('change', function() {
+        var container = document.getElementById('otherReasonContainer');
+        var textBox = document.getElementById('reason_other_text');
+        if (this.checked) {
+          container.style.display = 'block';
+          textBox.setAttribute('required', 'required');
+        } else {
+          container.style.display = 'none';
+          textBox.removeAttribute('required');
+        }
+      });
+    </script>
+    
+    <!-- Combined validation and confirmation trigger -->
+    <script>
+      document.getElementById("customerForm").addEventListener("submit", function(event) {
+        event.preventDefault(); // ป้องกันการ submit โดยตรง
+        var form = this;
+        var errorFound = false;
+        var firstInvalid = null;
+
+        // ตรวจสอบ HTML5 required fields
+        if (!form.checkValidity()) {
+          firstInvalid = form.querySelector(":invalid");
+          errorFound = true;
+        }
+
+        // --- 1) SX ที่เคยทำ ---
+        var surgeryEverChecked = document.getElementById('surgery_ever').checked;
+        if (surgeryEverChecked) {
+          var surgeryCheckboxes = document.querySelectorAll('input[name="previous_surgeries"]');
+          var surgeryChecked = Array.from(surgeryCheckboxes).some(cb => cb.checked);
+          if (!surgeryChecked) {
+            errorFound = true;
+            if (!firstInvalid && surgeryCheckboxes.length > 0) {
+              firstInvalid = surgeryCheckboxes[0];
+            }
+          }
+        }
+
+        // --- 2) ช่องทางที่รู้จักคลินิกของเรา ---
+        var referralCheckboxes = document.querySelectorAll('input[name="referral_channel"]');
+        var referralChecked = Array.from(referralCheckboxes).some(cb => cb.checked);
+        if (!referralChecked) {
+          errorFound = true;
+          if (!firstInvalid && referralCheckboxes.length > 0) {
+            firstInvalid = referralCheckboxes[0];
+          }
+        }
+
+        // --- 3) เหตุผลที่เลือกคลินิกของเรา ---
+        var reasonCheckboxes = document.querySelectorAll('input[name="reason_to_choose_clinic"]');
+        var reasonChecked = Array.from(reasonCheckboxes).some(cb => cb.checked);
+        if (!reasonChecked) {
+          errorFound = true;
+          if (!firstInvalid && reasonCheckboxes.length > 0) {
+            firstInvalid = reasonCheckboxes[0];
+          }
+        }
+
+        if (errorFound) {
+          alert("กรุณากรอกข้อมูลให้ครบ");
+          if (firstInvalid) {
+            firstInvalid.focus();
+            firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+          return false;
+        }
+
+        // ถ้าข้อมูลครบถ้วน ให้แสดง modal ยืนยันการบันทึก
+        var confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        confirmModal.show();
+
+        // เมื่อผู้ใช้งานกดยืนยัน (once handler เพื่อป้องกันการซ้ำซ้อน)
+        document.getElementById('confirmSubmit').addEventListener('click', function() {
+          confirmModal.hide();
+          form.submit();
+        }, { once: true });
+      });
+    </script>
+
+    <button type="submit" class="btn btn-primary">บันทึกข้อมูลลูกค้า</button>
+  </form>
+
+  <!-- Confirmation Modal -->
+  <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="confirmModalLabel">ยืนยันการบันทึกข้อมูล</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          คุณต้องการบันทึกข้อมูลลงในระบบหรือไม่?
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="button" class="btn btn-primary" id="confirmSubmit">ยืนยันการบันทึก</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+  <a href="/dashboard" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
+</div>
+
+<!-- Bootstrap 5 JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

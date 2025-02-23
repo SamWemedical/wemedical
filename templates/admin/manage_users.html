@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Manage Users</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f9f9f9;
+    }
+    .container {
+      margin: 30px auto;
+      max-width: 900px;
+    }
+    .card {
+      margin-top: 20px;
+    }
+    .table > thead {
+      background-color: #007bff;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container-fluid">
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+      <div class="alert alert-{{category}} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="card shadow">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h4 class="m-0">Manage Users</h4>
+      <!-- ปุ่มสร้างผู้ใช้ใหม่ -->
+      <a href="/admin/create_user" class="btn btn-success">Create New User</a>
+    </div>
+
+    <div class="card-body">
+      <table class="table table-bordered table-hover align-middle">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Username</th>
+            <th>Name</th>
+            <th>Role</th>
+            <th>Subcategory</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in user_list %}
+          <tr>
+            <td>{{ user.user_id }}</td>
+            <td>{{ user.username }}</td>
+            <td>{{ user.first_name }} {{ user.last_name }}</td>
+            <td>
+              <!-- แสดง role (text) ปัจจุบัน -->
+              {{ user.role or 'No Role' }}
+
+              <!-- ฟอร์มเปลี่ยน role_id => role -->
+              <form method="POST" action="{{ url_for('manage_users') }}" class="d-flex mt-2">
+                <input type="hidden" name="action_type" value="update_role">
+                <input type="hidden" name="user_id" value="{{ user.user_id }}">
+
+                <select name="role_id" class="form-select form-select-sm me-2" style="width:auto;">
+                  <option value="">-- เลือก Role --</option>
+                  {% for r in roles %}
+                    <option value="{{ r.role_id }}"
+                      {% if user.role_id == r.role_id %} selected{% endif %}
+                    >{{ r.role_name }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-primary">Update Role</button>
+              </form>
+            </td>
+            <td>
+              {% if user.sub_category_name %}
+                {{ user.sub_category_name }}
+              {% else %}
+                <span class="text-muted">No Subcategory</span>
+              {% endif %}
+
+              <!-- ฟอร์มเปลี่ยน Subcategory -->
+              <form method="POST" action="{{ url_for('manage_users') }}" class="d-flex mt-2">
+                <input type="hidden" name="action_type" value="update_subcategory">
+                <input type="hidden" name="user_id" value="{{ user.user_id }}">
+
+                {% if user.role_id in grouped_subcats %}
+                  <select name="sub_category_id" class="form-select form-select-sm me-2" style="width:auto;">
+                    <option value="">-- เลือก --</option>
+                    {% for sub in grouped_subcats[user.role_id] %}
+                      <option value="{{ sub.id }}"
+                        {% if user.sub_category_id == sub.id %} selected{% endif %}
+                      >{{ sub.name }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="btn btn-sm btn-warning">Update Subcat</button>
+                {% else %}
+                  <select name="sub_category_id" class="form-select form-select-sm me-2" disabled>
+                    <option value="">(No subcategory found)</option>
+                  </select>
+                  <button type="submit" class="btn btn-sm btn-warning" disabled>Update Subcat</button>
+                {% endif %}
+              </form>
+            </td>
+            <td>
+              <!-- ปุ่ม Reset Password -->
+              <a href="{{ url_for('reset_password', user_id=user.user_id) }}" class="btn btn-sm btn-danger">
+                Reset Password
+              </a>
+              <!-- ปุ่ม Delete User -->
+              <form method="POST" action="{{ url_for('delete_user', user_id=user.user_id) }}"
+                    onsubmit="return confirm('ยืนยันการลบผู้ใช้นี้?');"
+                    class="d-inline">
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                  Delete
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="text-end mt-3">
+        <a href="/admin" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

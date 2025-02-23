@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>ฐานเงินเดือนปัจจุบัน</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background-color: #f9f9f9;
+    }
+    .container {
+      margin-top: 40px;
+      max-width: 1000px;
+    }
+    .card-header {
+      background-color: #007bff;
+      color: #fff;
+    }
+    .table th, .table td {
+      text-align: center;
+      vertical-align: middle;
+    }
+    .btn-back {
+      background-color: #6c757d;
+      color: #fff;
+    }
+    .btn-back:hover {
+      color: #fff;
+      background-color: #5a6268;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="card shadow">
+    <!-- หัวข้อหน้า -->
+    <div class="card-header">
+      <h3 class="m-0">ฐานเงินเดือนปัจจุบัน</h3>
+    </div>
+
+    <!-- ตารางข้อมูล -->
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover">
+          <thead class="table-dark">
+            <tr>
+              <th>รหัสพนักงาน (user_id)</th>
+              <th>ชื่อ-สกุล</th>
+              <th>ฐานเงินเดือน (บาท/เดือน)</th>
+              <th>ค่าแรงรายวัน (บาท/วัน)</th>
+              <th>ค่าแรงรายชั่วโมง (บาท/ชม.)</th>
+              <th>วันที่มีผล (Effective Date)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            <tr>
+              <td>{{ row.user_id }}</td>
+              <td>{{ row.first_name }} {{ row.last_name }}</td>
+              <td>{{ "{:,.2f}".format(row.base_salary) }}</td>
+              <td>{{ "{:,.2f}".format(row.daily_wage) }}</td>
+              <td>{{ "{:,.2f}".format(row.hourly_wage) }}</td>
+              <td>{{ row.effective_date or '-' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <a href="/admin" class="btn btn-back mt-3">กลับสู่หน้าหลัก</a>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap 5 JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

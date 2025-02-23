@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>แก้ไขโปรไฟล์</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body { 
+      background-color: #f9f9f9; 
+      font-family: "Sarabun", sans-serif;
+    }
+    .container { 
+      max-width: 900px; 
+      margin: 40px auto; 
+    }
+    .card-header {
+      background-color: #0d6efd; /* สีน้ำเงิน */
+      color: #fff;
+    }
+    .d-none {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Flash Messages (แสดงสถานะบันทึกสำเร็จ/ผิดพลาด) -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, msg in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h3 class="m-0">แก้ไขโปรไฟล์</h3>
+      <!-- ปุ่มกลับสู่หน้าหลัก -->
+      <a href="/dashboard" class="btn btn-secondary btn-sm">กลับสู่หน้าหลัก</a>
+    </div>
+
+    <div class="card-body">
+      <form method="POST" autocomplete="off">
+
+        <!-- เพศ (gender) -->
+        <div class="mb-3">
+          <label class="form-label">เพศ</label>
+          <select name="gender" class="form-select">
+            <option value="">--ไม่ระบุ--</option>
+            <option value="นาย" {% if user.gender == 'นาย' %}selected{% endif %}>นาย</option>
+            <option value="นาง" {% if user.gender == 'นาง' %}selected{% endif %}>นาง</option>
+            <option value="นางสาว" {% if user.gender == 'นางสาว' %}selected{% endif %}>นางสาว</option>
+          </select>
+        </div>
+
+        <!-- ชื่อจริง-นามสกุล -->
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">ชื่อจริง</label>
+            <input type="text" name="first_name" class="form-control" value="{{ user.first_name or '' }}">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">นามสกุล</label>
+            <input type="text" name="last_name" class="form-control" value="{{ user.last_name or '' }}">
+          </div>
+        </div>
+
+        <!-- ชื่อเล่น -->
+        <div class="mb-3">
+          <label class="form-label">ชื่อเล่น</label>
+          <input type="text" name="nickname" class="form-control" value="{{ user.nickname or '' }}">
+        </div>
+
+        <!-- เบอร์โทร, ที่อยู่ -->
+        <div class="mb-3">
+          <label class="form-label">เบอร์โทรศัพท์</label>
+          <input type="text" name="phone" class="form-control" value="{{ user.phone or '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">ที่อยู่</label>
+          <textarea name="address" class="form-control" rows="3">{{ user.address or '' }}</textarea>
+        </div>
+
+        <!-- DOB -->
+        <div class="mb-3">
+          <label class="form-label">วันเกิด</label>
+          <input type="date" name="dob" class="form-control" value="{{ user.dob or '' }}">
+        </div>
+
+        <!-- การศึกษา -->
+        <div class="mb-3">
+          <label class="form-label">ระดับการศึกษา</label>
+          <select name="education_level" class="form-select">
+            <option value="">-- ไม่ระบุ --</option>
+            <option value="มัธยมปลาย" {% if user.education_level=='มัธยมปลาย' %}selected{% endif %}>มัธยมปลาย</option>
+            <option value="ปวช" {% if user.education_level=='ปวช' %}selected{% endif %}>ปวช.</option>
+            <option value="ปวส" {% if user.education_level=='ปวส' %}selected{% endif %}>ปวส.</option>
+            <option value="ปริญญาตรี" {% if user.education_level=='ปริญญาตรี' %}selected{% endif %}>ปริญญาตรี</option>
+            <option value="ปริญญาโท" {% if user.education_level=='ปริญญาโท' %}selected{% endif %}>ปริญญาโท</option>
+            <option value="ปริญญาเอก" {% if user.education_level=='ปริญญาเอก' %}selected{% endif %}>ปริญญาเอก</option>
+            <option value="อื่นๆ" {% if user.education_level=='อื่นๆ' %}selected{% endif %}>อื่นๆ</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">สถาบันการศึกษา</label>
+          <input type="text" name="education_institution" class="form-control" 
+                 value="{{ user.education_institution or '' }}">
+        </div>
+
+        <!-- เชื้อชาติ (ethnicity) -->
+        {% set default_eth = user.ethnicity or '' %}
+        {% if default_eth not in ['','ไทย','อินโดนีเซีย'] %}
+          {% set eth_select = 'อื่นๆ' %}
+          {% set eth_other = default_eth %}
+        {% else %}
+          {% set eth_select = default_eth %}
+          {% set eth_other = '' %}
+        {% endif %}
+
+        <div class="mb-3">
+          <label class="form-label">เชื้อชาติ</label>
+          <select class="form-select" name="ethnicity_select" id="ethnicity_select" onchange="checkOtherEthnicity()">
+            <option value="" {% if eth_select == '' %}selected{% endif %}>-- ไม่ระบุ --</option>
+            <option value="ไทย" {% if eth_select == 'ไทย' %}selected{% endif %}>ไทย</option>
+            <option value="อินโดนีเซีย" {% if eth_select == 'อินโดนีเซีย' %}selected{% endif %}>อินโดนีเซีย</option>
+            <option value="อื่นๆ" {% if eth_select == 'อื่นๆ' %}selected{% endif %}>อื่นๆ</option>
+          </select>
+          <div class="mt-2 {% if eth_select != 'อื่นๆ' %}d-none{% endif %}" id="other_ethnicity_div">
+            <input type="text" class="form-control" name="other_ethnicity" id="other_ethnicity" placeholder="โปรดระบุ"
+                   value="{{ eth_other }}">
+          </div>
+        </div>
+
+        <!-- สัญชาติ (nationality) -->
+        {% set default_nat = user.nationality or '' %}
+        {% if default_nat not in ['','ไทย','อินโดนีเซีย'] %}
+          {% set nat_select = 'อื่นๆ' %}
+          {% set nat_other = default_nat %}
+        {% else %}
+          {% set nat_select = default_nat %}
+          {% set nat_other = '' %}
+        {% endif %}
+
+        <div class="mb-3">
+          <label class="form-label">สัญชาติ</label>
+          <select class="form-select" name="nationality_select" id="nationality_select" onchange="checkOtherNationality()">
+            <option value="" {% if nat_select == '' %}selected{% endif %}>-- ไม่ระบุ --</option>
+            <option value="ไทย" {% if nat_select == 'ไทย' %}selected{% endif %}>ไทย</option>
+            <option value="อินโดนีเซีย" {% if nat_select == 'อินโดนีเซีย' %}selected{% endif %}>อินโดนีเซีย</option>
+            <option value="อื่นๆ" {% if nat_select == 'อื่นๆ' %}selected{% endif %}>อื่นๆ</option>
+          </select>
+          <div class="mt-2 {% if nat_select != 'อื่นๆ' %}d-none{% endif %}" id="other_nationality_div">
+            <input type="text" class="form-control" name="other_nationality" id="other_nationality" placeholder="โปรดระบุ"
+                   value="{{ nat_other }}">
+          </div>
+        </div>
+
+        <!-- คนติดต่อฉุกเฉิน -->
+        <hr>
+        <h5>บุคคลติดต่อฉุกเฉิน</h5>
+        <div class="mb-3">
+          <label class="form-label">ชื่อ</label>
+          <input type="text" name="emergency_name" class="form-control" value="{{ user.emergency_name or '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">เบอร์โทร</label>
+          <input type="text" name="emergency_phone" class="form-control" value="{{ user.emergency_phone or '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">สถานะความสัมพันธ์</label>
+          <input type="text" name="emergency_relation" class="form-control" value="{{ user.emergency_relation or '' }}">
+        </div>
+
+        <hr>
+        <!-- ความสามารถพิเศษ -->
+        <div class="mb-3">
+          <label class="form-label">ความสามารถพิเศษหรือผลงาน</label>
+          <textarea name="special_ability" class="form-control" rows="3">{{ user.special_ability or '' }}</textarea>
+        </div>
+
+        <!-- สถานที่ทำงานเดิม -->
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">สถานที่ทำงานล่าสุด</label>
+            <input type="text" name="prev_company" class="form-control" value="{{ user.prev_company or '' }}">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">ตำแหน่ง</label>
+            <input type="text" name="prev_position" class="form-control" value="{{ user.prev_position or '' }}">
+          </div>
+        </div>
+
+        <hr>
+        <button type="submit" class="btn btn-primary">บันทึก</button>
+      </form>
+    </div><!-- card-body -->
+  </div><!-- card -->
+</div><!-- container -->
+
+<!-- JS เพื่อซ่อน/แสดงช่อง "อื่นๆ" ในเชื้อชาติ/สัญชาติ -->
+<script>
+function checkOtherEthnicity() {
+  const sel = document.getElementById("ethnicity_select");
+  const divOther = document.getElementById("other_ethnicity_div");
+  if (sel.value === "อื่นๆ") {
+    divOther.classList.remove("d-none");
+  } else {
+    divOther.classList.add("d-none");
+  }
+}
+
+function checkOtherNationality() {
+  const sel = document.getElementById("nationality_select");
+  const divOther = document.getElementById("other_nationality_div");
+  if (sel.value === "อื่นๆ") {
+    divOther.classList.remove("d-none");
+  } else {
+    divOther.classList.add("d-none");
+  }
+}
+
+// เรียกครั้งแรกตอนโหลดหน้า (สำหรับค่าใน DB)
+checkOtherEthnicity();
+checkOtherNationality();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

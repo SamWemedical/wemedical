@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>User List (Table + Modal)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background-color: #f9f9f9;
+    }
+    h1 {
+      margin-top: 20px;
+      margin-bottom: 30px;
+    }
+    .container {
+      max-width: 1200px;
+      margin-top: 40px;
+    }
+    /* ตารางหลักมีเส้น Grid ทุกช่อง */
+    .main-table {
+      border: 1px solid #dee2e6;
+    }
+    .main-table thead {
+      background-color: #e9ecef;
+    }
+    /* Modal ภายในจัดเป็นตาราง 2 คอลัมน์ (Label/Value) */
+    .modal-table th {
+      width: 30%;
+      background-color: #f2f2f2;
+    }
+    .modal-table td {
+      background-color: #fff;
+    }
+    .btn-info {
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>ประวัติพนักงาน</h1>
+
+  <!-- ตารางหลัก (เฉพาะข้อมูลสั้น ๆ) -->
+  <table class="table table-hover table-bordered main-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>ชื่อ-นามสกุล</th>
+        <th>ชื่อเล่น</th>
+        <th>รหัส</th>
+        <th>แผนก</th>
+        <th>เบอร์โทรฯ</th>
+        <th>อายุ</th>
+        <th>อายุงาน</th>
+        <th>ข้อมูลเพิ่มเติม</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in user_list %}
+      <tr>
+        <td>{{ user.user_id }}</td>
+        <td><strong>{{ user.first_name }} {{ user.last_name }}</strong></td>
+        <td>{{ user.nickname or '-' }}</td>
+        <td>{{ user.pr_code or '-' }}</td>
+        <td>{{ user.sub_category_name or '-' }}</td>
+        <td>{{ user.phone or '-' }}</td>
+        <td>{{ user.age or '-' }}</td>
+        <td>{{ user.service_age or '-' }}</td>
+        <td>
+          <!-- ปุ่มเปิด Modal (ใช้ data-bs-target ชี้ไปที่ modal ด้านล่าง) -->
+          <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#userModal{{ user.user_id }}">
+            เรียกดู
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  
+  <!-- ลิงก์กลับหน้าหลัก -->
+  <a href="/dashboard" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
+</div>
+
+<!-- ส่วนของ Modal แยกจากตาราง: วนลูปอีกครั้ง -->
+{% for user in user_list %}
+<div class="modal fade" id="userModal{{ user.user_id }}" tabindex="-1" aria-labelledby="modalLabel{{ user.user_id }}" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+
+      <!-- หัวข้อของ Modal -->
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalLabel{{ user.user_id }}">
+          ข้อมูลผู้ใช้ (User ID: {{ user.user_id }})
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <!-- เนื้อหา Modal: จัดเป็นตาราง Label / Value -->
+      <div class="modal-body">
+        <table class="table table-bordered modal-table">
+          <tbody>
+            <tr>
+              <th>ชื่อ-นามสกุล</th>
+              <td>{{ user.first_name }} {{ user.last_name }}</td>
+            </tr>
+            <tr>
+              <th>ชื่อเล่น</th>
+              <td>{{ user.nickname or '-' }}</td>
+            </tr>
+            tr>
+              <th>รหัส</th>
+              <td>{{ user.pr_code or '-' }}</td>
+            </tr>
+            <tr>
+              <th>ตำแหน่ง (Role)</th>
+              <td>{{ user.role }}</td>
+            </tr>
+            <tr>
+              <th>แผนก</th>
+              <td>{{ user.sub_category_name or '-' }}</td>
+            </tr>
+            <tr>
+              <th>เบอร์โทรฯ</th>
+              <td>{{ user.phone or '-' }}</td>
+            </tr>
+            <tr>
+              <th>ที่อยู่</th>
+              <td>{{ user.address or '-' }}</td>
+            </tr>
+            <tr>
+              <th>วันเกิด</th>
+              <td>{{ user.dob or '-' }}</td>
+            </tr>
+            <tr>
+              <th>อายุ</th>
+              <td>{{ user.age or '-' }}</td>
+            </tr>
+            <tr>
+              <th>วันเริ่มงาน</th>
+              <td>{{ user.start_date or '-' }}</td>
+            </tr>
+            <tr>
+              <th>อายุงาน</th>
+              <td>{{ user.service_age or '-' }}</td>
+            </tr>
+            <tr>
+              <th>ระดับการศึกษา</th>
+              <td>{{ user.education_level or '-' }}</td>
+            </tr>
+            <tr>
+              <th>สถาบันการศึกษา</th>
+              <td>{{ user.education_institution or '-' }}</td>
+            </tr>
+            <tr>
+              <th>เชื้อชาติ</th>
+              <td>{{ user.ethnicity or '-' }}</td>
+            </tr>
+            <tr>
+              <th>สัญชาติ</th>
+              <td>{{ user.nationality or '-' }}</td>
+            </tr>
+            <tr>
+              <th>บุคคลติดต่อกรณีฉุกเฉิน</th>
+              <td>{{ user.emergency_name or '-' }}</td>
+            </tr>
+            <tr>
+              <th>เบอร์โทรฯ ฉุกเฉิน</th>
+              <td>{{ user.emergency_phone or '-' }}</td>
+            </tr>
+            <tr>
+              <th>ความสัมพันธ์</th>
+              <td>{{ user.emergency_relation or '-' }}</td>
+            </tr>
+            <tr>
+              <th>สถานที่ทำงานล่าสุด</th>
+              <td>{{ user.prev_company or '-' }}</td>
+            </tr>
+            <tr>
+              <th>ตำแหน่งงานล่าสุด</th>
+              <td>{{ user.prev_position or '-' }}</td>
+            </tr>
+            <tr>
+              <th>ความสามารถพิเศษ</th>
+              <td>{{ user.special_ability or '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- ถ้าเป็น ADMIN ให้แสดงปุ่ม Delete -->
+        {% if role == 'ADMIN' %}
+        <form method="POST" action="/admin/delete_user/{{ user.user_id }}" onsubmit="return confirm('ยืนยันลบผู้ใช้นี้?');">
+          <button type="submit" class="btn btn-danger btn-sm mt-2">Delete</button>
+        </form>
+        {% endif %}
+      </div>
+      <!-- /modal-body -->
+
+    </div><!-- /modal-content -->
+  </div><!-- /modal-dialog -->
+</div><!-- /modal -->
+{% endfor %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

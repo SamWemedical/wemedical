@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>ลงทะเบียนพนักงาน (Register Employee)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Bootstrap 5 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+
+  <style>
+    body {
+      background-color: #f9f9f9;
+    }
+    .register-container {
+      max-width: 700px; 
+      margin: 60px auto;
+    }
+    .d-none {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+<div class="register-container">
+  <h2 class="text-center mb-4">ลงทะเบียนพนักงาน</h2>
+
+  <div class="card shadow">
+    <div class="card-body">
+      <form method="POST" action="/user/register_employee">
+        <!-- ชื่อจริง -->
+        <div class="mb-3">
+          <label for="first_name" class="form-label">ชื่อจริง <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="first_name" name="first_name" required>
+        </div>
+        <!-- นามสกุล -->
+        <div class="mb-3">
+          <label for="last_name" class="form-label">นามสกุล <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="last_name" name="last_name" required>
+        </div>
+        <!-- ชื่อเล่น -->
+        <div class="mb-3">
+          <label for="nickname" class="form-label">ชื่อเล่น</label>
+          <input type="text" class="form-control" id="nickname" name="nickname">
+        </div>
+
+        <!-- Username -->
+        <div class="mb-3">
+          <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="username" name="username" required>
+        </div>
+        <!-- Password -->
+        <div class="mb-3">
+          <label for="password" class="form-label">Password <span class="text-danger">*</span></label>
+          <input type="password" class="form-control" id="password" name="password" required>
+        </div>
+
+        <!-- ปุ่ม/ฟิลด์ PR CODE -->
+        <div class="mb-3">
+          <label for="pr_code" class="form-label">รหัส PR (ถ้ามี)</label>
+          <input type="text" class="form-control" id="pr_code" name="pr_code" placeholder="เช่น AB123, ถ้าไม่มีให้เว้นว่างได้">
+        </div>
+
+        <!-- โค้ดเข้าร่วม -->
+        <div class="mb-3">
+          <label for="join_code" class="form-label">โค้ดเข้าร่วม<span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="join_code" name="join_code" required>
+        </div>
+        
+        <hr>
+        <!-- เบอร์โทรศัพท์ -->
+        <div class="mb-3">
+          <label for="phone" class="form-label">เบอร์โทรศัพท์</label>
+          <input type="text" class="form-control" id="phone" name="phone">
+        </div>
+        <!-- ที่อยู่ -->
+        <div class="mb-3">
+          <label for="address" class="form-label">ที่อยู่</label>
+          <textarea class="form-control" id="address" name="address" rows="3"></textarea>
+        </div>
+        <!-- วันเกิด -->
+        <div class="mb-3">
+          <label for="dob" class="form-label">วันเกิด</label>
+          <input type="date" class="form-control" id="dob" name="dob">
+        </div>
+        <!-- วันเริ่มงาน -->
+        <div class="mb-3">
+          <label for="start_date" class="form-label">วันเริ่มงาน</label>
+          <input type="date" class="form-control" id="start_date" name="start_date">
+        </div>
+
+        <hr>
+        <!-- การศึกษาสูงสุด -->
+        <div class="mb-3">
+          <label for="education_level" class="form-label">การศึกษาสูงสุด</label>
+          <select class="form-select" id="education_level" name="education_level">
+            <option value="">-- เลือกระดับการศึกษา --</option>
+            <option value="มัธยมปลาย">มัธยมปลาย</option>
+            <option value="ปวช.">ปวช.</option>
+            <option value="ปวส.">ปวส.</option>
+            <option value="ปริญญาตรี">ปริญญาตรี</option>
+            <option value="ปริญญาโท">ปริญญาโท</option>
+            <option value="ปริญญาเอก">ปริญญาเอก</option>
+            <option value="อื่นๆ">อื่นๆ</option>
+          </select>
+        </div>
+        <!-- ชื่อมหาวิทยาลัย/สถาบัน -->
+        <div class="mb-3">
+          <label for="university_name" class="form-label">ชื่อสถาบัน / มหาวิทยาลัย</label>
+          <input type="text" class="form-control" id="university_name" name="university_name">
+        </div>
+
+        <hr>
+        <!-- เชื้อชาติ -->
+        <div class="mb-3">
+          <label class="form-label">เชื้อชาติ</label>
+          <select class="form-select" name="ethnicity" id="ethnicity" onchange="toggleOtherEthnicity()">
+            <option value="">-- เลือกเชื้อชาติ --</option>
+            <option value="ไทย">ไทย</option>
+            <option value="อินโดนีเซีย">อินโดนีเซีย</option>
+            <option value="อื่นๆ">อื่นๆ</option>
+          </select>
+          <div class="mt-2 d-none" id="other_ethnicity_div">
+            <input type="text" class="form-control" name="other_ethnicity" id="other_ethnicity" placeholder="ระบุประเทศ">
+          </div>
+        </div>
+        <!-- สัญชาติ -->
+        <div class="mb-3">
+          <label class="form-label">สัญชาติ</label>
+          <select class="form-select" name="nationality" id="nationality" onchange="toggleOtherNationality()">
+            <option value="">-- เลือกสัญชาติ --</option>
+            <option value="ไทย">ไทย</option>
+            <option value="อินโดนีเซีย">อินโดนีเซีย</option>
+            <option value="อื่นๆ">อื่นๆ</option>
+          </select>
+          <div class="mt-2 d-none" id="other_nationality_div">
+            <input type="text" class="form-control" name="other_nationality" id="other_nationality" placeholder="ระบุประเทศ">
+          </div>
+        </div>
+
+        <hr>
+        <!-- คนติดต่อฉุกเฉิน -->
+        <div class="mb-3">
+          <label for="emergency_name" class="form-label">ชื่อบุคคลติดต่อฉุกเฉิน</label>
+          <input type="text" class="form-control" id="emergency_name" name="emergency_name">
+        </div>
+        <div class="mb-3">
+          <label for="emergency_phone" class="form-label">เบอร์โทร (บุคคลติดต่อฉุกเฉิน)</label>
+          <input type="text" class="form-control" id="emergency_phone" name="emergency_phone">
+        </div>
+        <div class="mb-3">
+          <label for="emergency_relation" class="form-label">ความสัมพันธ์</label>
+          <input type="text" class="form-control" id="emergency_relation" name="emergency_relation">
+        </div>
+
+        <hr>
+        <!-- ความสามารถพิเศษ -->
+        <div class="mb-3">
+          <label for="special_ability" class="form-label">ความสามารถพิเศษ / ผลงานที่ผ่านมา</label>
+          <textarea class="form-control" id="special_ability" name="special_ability" rows="2"></textarea>
+        </div>
+        <!-- สถานที่ทำงานล่าสุด -->
+        <div class="mb-3">
+          <label for="last_workplace" class="form-label">สถานที่ทำงานล่าสุด</label>
+          <input type="text" class="form-control" id="last_workplace" name="last_workplace">
+        </div>
+        <!-- ตำแหน่งล่าสุด -->
+        <div class="mb-3">
+          <label for="last_position" class="form-label">ตำแหน่งงานล่าสุด</label>
+          <input type="text" class="form-control" id="last_position" name="last_position">
+        </div>
+
+        <hr>
+        <div class="d-grid mt-4">
+          <button type="submit" class="btn btn-success">ลงทะเบียน</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="text-center mt-3">
+    <hr>
+    <a href="/login" class="btn btn-link">กลับหน้า Login</a>
+  </div>
+</div>
+
+<script>
+  // Toggle "อื่นๆ" เชื้อชาติ
+  function toggleOtherEthnicity() {
+    const sel = document.getElementById('ethnicity');
+    const divOther = document.getElementById('other_ethnicity_div');
+    if (sel.value === 'อื่นๆ') {
+      divOther.classList.remove('d-none');
+    } else {
+      divOther.classList.add('d-none');
+    }
+  }
+  // Toggle "อื่นๆ" สัญชาติ
+  function toggleOtherNationality() {
+    const sel = document.getElementById('nationality');
+    const divOther = document.getElementById('other_nationality_div');
+    if (sel.value === 'อื่นๆ') {
+      divOther.classList.remove('d-none');
+    } else {
+      divOther.classList.add('d-none');
+    }
+  }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
