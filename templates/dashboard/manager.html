@@ -12,16 +12,16 @@
       background-color: #f9f9f9;
     }
     .dashboard-container {
-      max-width: 900px;
+      max-width: 600px;
       margin: 40px auto;
     }
     .card-header {
-      background-color: #17a2b8;
-      color: #fff;
+      background-color: #ffffff;
+      color: #000000;
     }
     .card-top {
-      background-color: #961d4f;
-      color: #fff;
+      background-color: #fafafa;
+      color: #000000;
     }
     .badge-notification {
       background-color: #dc3545;
@@ -44,6 +44,22 @@
       color: #17a2b8;
       text-decoration: underline;
     }
+    .btn-user {
+      background-color: #2ed03e;
+      width: 100%;
+    }
+    .btn-manage {
+      background-color: #4949d2;
+      width: 100%;
+    }
+    .btn-employee {
+      background-color: #00aeff;
+      width: 100%;
+    }
+    .btn-personal {
+      background-color: #d02ecd;
+      width: 100%;
+    }
   </style>
 </head>
 <body>
@@ -57,38 +73,30 @@
 
       <!-- รายการเมนู -->
       <ul class="list-group mb-3">
-        <!-- หมวดหมู่: เข้า-ออกงาน -->
-        <li class="list-group-item card-top text-white fw-bold">เข้า-ออกงาน</li>
-        <li class="list-group-item"><a href="/check_in_out">บันทึกเวลาเข้า-ออกงาน (ตัวเอง)</a></li>
-        <li class="list-group-item"><a href="/my_summary">สรุปการเข้า-ออกงาน (ตัวเอง)</a></li>
-
-        <!-- หมวดหมู่: ลางาน -->
-        <li class="list-group-item card-top text-white fw-bold">ลางาน</li>
-        <li class="list-group-item"><a href="/leave_request">ยื่นคำร้องขอลางาน (ตัวเอง)</a></li>
-        <li class="list-group-item"><a href="/my_leave_requests">ดูคำขอลางาน (ตัวเอง)</a></li>
-        <li class="list-group-item"><a href="/my_leave_quota">ดูสิทธิ์วันลาคงเหลือ (ตัวเอง)</a></li>
-        <li class="list-group-item"><a href="/festival_option">เลือกประเภทวันหยุดนักขัติฯ</a></li>
-
-        <!-- หมวดหมู่: เงินเดือน และ สวัสดิการของฉัน -->
-        <li class="list-group-item card-top text-white fw-bold">เงินเดือน และ สวัสดิการ</li>
-        <li class="list-group-item"><a href="/pr_income_summary">สรุปยอดรายเดือน PR</a></li>
-        <li class="list-group-item"><a href="/payroll_summary">ดูสรุปเงินเดือน (ตัวเอง)</a></li>
-        <li class="list-group-item"><a href="/insurance_stop_request">ขอหยุด/กลับมาหัก เงินสะสม (ตัวเอง)</a></li>
-        <li class="list-group-item"><a href="/insurance_withdraw_request">ขอเบิก เงินสะสม (ตัวเอง)</a></li>
+        <!-- หมวดหมู่: ส่วนตัว -->
+        <li class="list-group-item card-top text-black fw-bold">ส่วนตัว</li>
+        <li class="list-group-item"><a href="/check_in_out" class="btn btn-user text-white">บันทึกเวลาเข้า-ออกงาน</a></li>
+        <li class="list-group-item"><a href="/leave_request" class="btn btn-user text-white">ยื่นใบลา</a></li>
+        <li class="list-group-item"><a href="/payroll_summary" class="btn btn-user text-white">เงินเดือน</a></li>
+        <li class="list-group-item"><a href="/pr_income_summary" class="btn btn-user text-white">ยอดขาย</a></li>
+        <li class="list-group-item"><a href="/ot_summary" class="btn btn-user text-white">สรุปการเข้า-ออกงาน</a></li>
         
         <!-- หมวดหมู่: จัดการพนักงาน -->
-        <li class="list-group-item card-top text-white fw-bold">จัดการพนักงาน</li>
-        <li class="list-group-item"><a href="/aes_commission">บันทึก/แก้ไข ค่ามือ AES รายวัน</a></li>
-        <li class="list-group-item"><a href="/ot_approval_list">อนุมัติ OT รายวัน</a></li>
-        <li class="list-group-item"><a href="/leave_approval_list">อนุมัติ คำขอลางาน</a></li>
-        <li class="list-group-item"><a href="/hr/summary_form2">สรุปการเข้า-ออกงาน (พนักงาน)</a></li>
-        <li class="list-group-item"><a href="/user/user_list">ฐานข้อมูล (พนักงาน)</a></li>
-        <li class="list-group-item"><a href="/aes_commission_rate">ตั้งเรทค่ามือ AES</a></li>
+        <li class="list-group-item card-top text-black fw-bold">จัดการพนักงาน</li>
+        <li class="list-group-item"><a href="/ot_approval_list" class="btn btn-manage text-white">อนุมัติ OT รายวัน</a></li>
+        <li class="list-group-item"><a href="/leave_approval_list" class="btn btn-manage text-white">อนุมัติ คำขอลางาน</a></li>
+        <li class="list-group-item"><a href="/hr/ot_summary_step1" class="btn btn-manage text-white">สรุปการเข้า-ออกงาน (พนักงาน)</a></li>
+        <li class="list-group-item"><a href="/user/user_list" class="btn btn-manage text-white">ฐานข้อมูล (พนักงาน)</a></li>
+        <li class="list-group-item"><a href="/aes_commission" class="btn btn-manage text-white">บันทึก/แก้ไข ค่ามือ AES รายวัน</a></li>
+        <li class="list-group-item"><a href="/aes_commission_rate" class="btn btn-manage text-white">ตั้งเรทค่ามือ AES</a></li>
 
         <!-- หมวดหมู่: ส่วนตัว -->
-        <li class="list-group-item card-top text-white fw-bold">ส่วนตัว</li>
-        <li class="list-group-item"><a href="/user/edit_profile">แก้ไข/กรอกข้อมูลส่วนตัว</a></li>
-        <li class="list-group-item"><a href="/user/change_password">เปลี่ยน Password</a></li>
+        <li class="list-group-item card-top text-black fw-bold">ส่วนตัว</li>
+        <li class="list-group-item"><a href="/user/edit_profile" class="btn btn-personal text-white">แก้ไขข้อมูลส่วนตัว</a></li>
+        <li class="list-group-item"><a href="/user/change_password" class="btn btn-personal text-white">เปลี่ยน Password</a></li>
+        <li class="list-group-item"><a href="/festival_option" class="btn btn-personal text-white">เลือกประเภทวันหยุดนักขัติฯ</a></li>
+        <li class="list-group-item"><a href="/insurance_stop_request" class="btn btn-personal text-white">ขอหยุด/กลับมาหัก เงินสะสม</a></li>
+        <li class="list-group-item"><a href="/insurance_withdraw_request" class="btn btn-personal text-white">ขอเบิก เงินสะสม</a></li>
         <li class="list-group-item">
           <a href="/my_notifications">การแจ้งเตือนของฉัน</a>
           {% if unread_notifications > 0 %}

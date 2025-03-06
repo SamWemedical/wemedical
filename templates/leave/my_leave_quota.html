@@ -11,7 +11,7 @@
       font-family: "Sarabun", sans-serif;
     }
     .container {
-      max-width: 900px;
+      max-width: 600px;
       margin: 40px auto;
     }
     .card {
@@ -19,7 +19,7 @@
       box-shadow: 0 0 10px rgba(0,0,0,0.05);
     }
     .card-header {
-      background-color: #0d6efd;
+      background-color: #6610f2;
       color: #fff;
       padding: 10px 15px;
     }
@@ -40,6 +40,18 @@
       text-align: center;
       vertical-align: middle;
     }
+    .btn-leave {
+      background-color: #6610f2;
+      color: black;
+      width: 92%;
+    }
+    .btn-leave:hover {
+      background-color: #915be8;
+      text-decoration: underline;
+    }
+    .btn-secondary {
+      width: 45%;
+    }
     /* กลุ่มปุ่มนำทางด้านล่าง */
     .btn-group-bottom {
       display: flex;
@@ -53,12 +65,10 @@
 <body>
 
 <div class="container">
-  <h4 class="mb-4 text-center">สิทธิ์วันลาคงเหลือของฉัน (รวมทุกประเภท)</h4>
-
   {% for year, quota_list in quota_by_year.items() %}
   <div class="card">
-    <div class="card-header bg-info text-white">
-      <strong>ปี {{ year }}</strong>
+    <div class="card-header text-white">
+      <h4>สิทธิ์วันลาคงเหลือ: ปี {{ year }}</h4>
     </div>
     <div class="card-body">
       <!-- Section สำหรับสิทธิ์วันลาคงเหลือ (กลุ่ม quota) -->
@@ -67,13 +77,13 @@
         <table class="table table-bordered table-hover">
           <thead class="table-light">
             <tr>
-              <th>ประเภทลา</th>
-              <th>ยกมาจากปีก่อน</th>
-              <th>รวมสิทธิ์ทั้งหมดของปีนี้</th>
+              <th>ประเภท</th>
+              <th>ยอดยกมา</th>
+              <th class="text-success">รวมสิทธิ์ลาของปีนี้</th>
               <th>ปีนี้ลาไปแล้ว</th>
               <th>คงเหลือ (ปัจจุบัน)</th>
               <th>ลาล่วงหน้า (อนุมัติแล้ว)</th>
-              <th>คงเหลือ (ทั้งหมด)</th>
+              <th class="text-success">คงเหลือ (ทั้งหมด)</th>
             </tr>
           </thead>
           <tbody>
@@ -81,11 +91,11 @@
             <tr>
               <td>{{ q.leave_type }}</td>
               <td>{{ q.carry_forward }}</td>
-              <td>{{ q.total_days }}</td>
+              <td class="text-success"><strong>{{ q.total_days }}</strong></td>
               <td>{{ q.used_past }}</td>
               <td>{{ q.leftover_present }}</td>
               <td>{{ q.used_future }}</td>
-              <td>{{ q.leftover_total }}</td>
+              <td class="text-success"><strong>{{ q.leftover_total }}</strong></td>
             </tr>
             {% endfor %}
           </tbody>
@@ -123,7 +133,7 @@
 
   <!-- กลุ่มปุ่มนำทางด้านล่าง (ปรับให้เป็นกลุ่มเดียว) -->
   <div class="btn-group-bottom">
-    <a href="/my_leave_requests" class="btn btn-secondary">ดูคำขอลาของฉัน</a>
+    <a href="/my_leave_requests" class="btn btn-leave text-white">ดูคำขอลาของฉัน</a>
     <a href="javascript:history.back()" class="btn btn-secondary">ย้อนกลับ</a>
     <a href="/dashboard" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
   </div>

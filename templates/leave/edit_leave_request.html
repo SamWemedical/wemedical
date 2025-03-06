@@ -5,7 +5,6 @@
   <title>แก้ไขคำขอลา</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
-
   <style>
     body {
       background-color: #f9f9f9;
@@ -14,10 +13,14 @@
       max-width: 600px;
       margin: 40px auto;
     }
+    .card {
+      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    }
     .card-header {
       background-color: #6610f2;
       color: #fff;
       text-align: center;
+      padding: 12px;
     }
     .btn-primary, .btn-secondary {
       width: 100%;
@@ -30,35 +33,52 @@
   </style>
 </head>
 <body>
-
 <div class="container">
   <div class="card shadow">
     <div class="card-header">
       <h4 class="m-0">แก้ไขคำขอลา</h4>
     </div>
     <div class="card-body">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, msg in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ msg }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <!-- ฟอร์มแก้ไขคำขอลา โดยคง helper functions สำหรับ validate และคำนวณจำนวนวันลา -->
       <form method="POST" onsubmit="return validateLeaveForm()">
         <!-- ประเภทการลา -->
         <div class="mb-3">
           <label for="leave_type" class="form-label">ประเภทการลา:</label>
           <select id="leave_type" name="leave_type" class="form-select" required onchange="toggleDateValidation()">
-            <option value="vacation" {% if leave.leave_type == 'vacation' %}selected{% endif %}>ลาพักร้อน</option>
-            <option value="personal" {% if leave.leave_type == 'personal' %}selected{% endif %}>ลากิจ</option>
-            <option value="sick" {% if leave.leave_type == 'sick' %}selected{% endif %}>ลาป่วย</option>
-            <option value="unpaid" {% if leave.leave_type == 'unpaid' %}selected{% endif %}>ลาหักเงิน</option>
-            <option value="urgent" {% if leave.leave_type == 'urgent' %}selected{% endif %}>ลาฉุกเฉิน</option>
-            <option value="funeral_no_deduction" {% if leave.leave_type == 'funeral_no_deduction' %}selected{% endif %}>ลางานศพ (ไม่หักเงิน)</option>
-            <option value="funeral_with_deduction" {% if leave.leave_type == 'funeral_with_deduction' %}selected{% endif %}>ลางานศพ (หักเงิน)</option>
+            <option value="ลาพักร้อน" {% if leave.leave_type == 'ลาพักร้อน' %}selected{% endif %}>ลาพักร้อน</option>
+            <option value="ลากิจ" {% if leave.leave_type == 'ลากิจ' %}selected{% endif %}>ลากิจ</option>
+            <option value="ลาป่วย" {% if leave.leave_type == 'ลาป่วย' %}selected{% endif %}>ลาป่วย</option>
+            <option value="ลาหักเงิน" {% if leave.leave_type == 'ลาหักเงิน' %}selected{% endif %}>ลาหักเงิน</option>
+            <option value="ลาฉุกเฉิน" {% if leave.leave_type == 'ลาฉุกเฉิน' %}selected{% endif %}>ลาฉุกเฉิน</option>
+            <option value="ลางานศพ (ไม่หักเงิน)" {% if leave.leave_type == 'ลางานศพ (ไม่หักเงิน)' %}selected{% endif %}>ลางานศพ (ไม่หักเงิน)</option>
+            <option value="ลางานศพ (หักเงิน)" {% if leave.leave_type == 'ลางานศพ (หักเงิน)' %}selected{% endif %}>ลางานศพ (หักเงิน)</option>
           </select>
         </div>
 
-        <!-- วันเริ่มต้น -->
+        <!-- วันเริ่มต้นลา -->
         <div class="mb-3">
           <label for="start_date" class="form-label">วันเริ่มต้นลา:</label>
           <input type="date" id="start_date" name="start_date" class="form-control" value="{{ leave.start_date }}" required>
         </div>
 
-        <!-- วันสิ้นสุด -->
+        <!-- จำนวนวันลา (ถ้ามีการระบุ จำนวนวันลา ระบบจะคำนวณวันสิ้นสุดให้อัตโนมัติ) -->
+        <div class="mb-3">
+          <label for="leave_days" class="form-label">จำนวนวันลา:</label>
+          <input type="number" id="leave_days" name="leave_days" class="form-control" min="1" placeholder="ระบุจำนวนวันลา (ถ้าไม่ระบุ ระบบจะคำนวณให้อัตโนมัติ)">
+        </div>
+
+        <!-- วันสิ้นสุดลา -->
         <div class="mb-3">
           <label for="end_date" class="form-label">วันสิ้นสุดลา:</label>
           <input type="date" id="end_date" name="end_date" class="form-control" value="{{ leave.end_date }}" required>
@@ -80,54 +100,109 @@
   </div>
 </div>
 
+<!-- Helper Functions สำหรับคำนวณและ validate ข้อมูล -->
 <script>
-  // ตรวจสอบวันเริ่มต้นและวันสิ้นสุด
-  function validateLeaveForm() {
-    const startDate = document.getElementById("start_date").value;
-    const endDate = document.getElementById("end_date").value;
-    const leaveType = document.getElementById("leave_type").value;
+  let isUpdating = false;
 
-    if (!startDate || !endDate) {
+  const leaveTypeSelect = document.getElementById('leave_type');
+  const startDateInput = document.getElementById('start_date');
+  const endDateInput = document.getElementById('end_date');
+  const leaveDaysInput = document.getElementById('leave_days');
+  const leftoverInfo = document.getElementById('leftover-info');
+  const displayLeaveDaysDiv = document.getElementById('display_leave_days');
+
+  let leftoverTotal = 0; // สมมุติว่ามีการกำหนดไว้ผ่าน API
+
+  // คำนวณจำนวนวันลาโดยใช้วันเริ่มต้นและวันสิ้นสุด (S และ E) => D
+  function updateFromDates() {
+    if (isUpdating) return;
+    isUpdating = true;
+    const startDateValue = startDateInput.value;
+    const endDateValue = endDateInput.value;
+    if (startDateValue && endDateValue) {
+      const sdt = new Date(startDateValue);
+      const edt = new Date(endDateValue);
+      let daysReq = Math.floor((edt - sdt) / (1000 * 3600 * 24)) + 1;
+      if (daysReq < 1) daysReq = 1;
+      leaveDaysInput.value = daysReq;
+      displayLeaveDaysDiv.style.display = 'block';
+      displayLeaveDaysDiv.innerHTML = `<p class="fw-bold">จำนวนวันลา: ${daysReq} วัน</p>`;
+    }
+    isUpdating = false;
+  }
+
+  // คำนวณวันสิ้นสุดจากวันเริ่มต้นและจำนวนวันลา (S และ D) => E
+  function updateFromLeaveDays() {
+    if (isUpdating) return;
+    isUpdating = true;
+    const startDateValue = startDateInput.value;
+    const leaveDaysValue = parseInt(leaveDaysInput.value);
+    if (startDateValue && leaveDaysValue && leaveDaysValue >= 1) {
+      const sdt = new Date(startDateValue);
+      const edt = new Date(sdt);
+      edt.setDate(edt.getDate() + leaveDaysValue - 1);
+      const yyyy = edt.getFullYear();
+      const mm = String(edt.getMonth() + 1).padStart(2, '0');
+      const dd = String(edt.getDate()).padStart(2, '0');
+      endDateInput.value = `${yyyy}-${mm}-${dd}`;
+      displayLeaveDaysDiv.style.display = 'block';
+      displayLeaveDaysDiv.innerHTML = `<p class="fw-bold">จำนวนวันลา: ${leaveDaysValue} วัน</p>`;
+    }
+    isUpdating = false;
+  }
+
+  startDateInput.addEventListener('change', () => {
+    if (leaveDaysInput.value && leaveDaysInput.value.trim() !== "") {
+      updateFromLeaveDays();
+    } else if (endDateInput.value) {
+      updateFromDates();
+    }
+    // คุณอาจเรียก checkLeftoverTotal() ที่นี่ด้วยถ้ามีการตรวจสอบสิทธิ์ลา
+  });
+
+  endDateInput.addEventListener('change', () => {
+    updateFromDates();
+  });
+
+  leaveDaysInput.addEventListener('input', () => {
+    updateFromLeaveDays();
+  });
+
+  function validateLeaveForm() {
+    const startDateValue = startDateInput.value;
+    const endDateValue = endDateInput.value;
+    const leaveTypeValue = leaveTypeSelect.value;
+    if (!startDateValue || !endDateValue) {
       alert("กรุณากรอกข้อมูลทุกช่อง");
       return false;
     }
-
-    if (new Date(startDate) > new Date(endDate)) {
+    if (new Date(startDateValue) > new Date(endDateValue)) {
       alert("วันสิ้นสุดต้องไม่น้อยกว่าวันเริ่มต้น");
       return false;
     }
-
     const today = new Date();
     const pastLimit = new Date(today);
     pastLimit.setDate(today.getDate() - 7);
-
-    // เงื่อนไขสำหรับประเภทการลาที่สามารถย้อนหลังได้
-    const allowPastLeaveTypes = [
-      "sick", 
-      "unpaid", 
-      "urgent", 
-      "funeral_no_deduction", 
-      "funeral_with_deduction"
-    ];
-
-    if (allowPastLeaveTypes.includes(leaveType)) {
-      if (new Date(startDate) < pastLimit) {
+    const allowPastLeaveTypes = ["sick", "unpaid", "urgent", "funeral_no_deduction", "funeral_with_deduction"];
+    if (allowPastLeaveTypes.includes(leaveTypeValue)) {
+      if (new Date(startDateValue) < pastLimit) {
         alert("วันเริ่มต้นลาย้อนหลังได้ไม่เกิน 7 วัน");
         return false;
       }
     } else {
-      if (new Date(startDate) < today.setHours(0, 0, 0, 0)) {
+      const today0 = new Date();
+      today0.setHours(0, 0, 0, 0);
+      if (new Date(startDateValue) < today0) {
         alert("วันเริ่มต้นต้องไม่น้อยกว่าวันปัจจุบัน");
         return false;
       }
     }
-
+    // สมมุติว่ามีการตรวจสอบ leftover ด้วยแล้ว (ในกรณีนี้ validateLeaveForm จะ return true ถ้าทุกอย่างถูกต้อง)
     return true;
   }
 
-  // อัปเดตการตรวจสอบวันย้อนหลังเมื่อเปลี่ยนประเภทการลา
   function toggleDateValidation() {
-    validateLeaveForm();
+    return validateLeaveForm();
   }
 </script>
 

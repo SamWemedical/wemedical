@@ -35,7 +35,7 @@
             <option value="">-- เลือกพนักงาน --</option>
             {% for user in users %}
               <option value="{{ user.user_id }}" {% if selected_user_id == user.user_id|string %}selected{% endif %}>
-                {{ user.first_name }} {{ user.last_name }}
+                {{ user.nickname }} -- {{ user.first_name }} {{ user.last_name }}
               </option>
             {% endfor %}
           </select>

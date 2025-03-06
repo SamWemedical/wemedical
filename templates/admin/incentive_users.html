@@ -56,8 +56,6 @@
       <table class="table table-bordered table-hover align-middle">
         <thead>
           <tr>
-            <th>#</th>
-            <th>Role</th>
             <th>PR</th>
             <th>Name</th>
             <th>Inc SX</th>
@@ -79,13 +77,8 @@
           {% if users and users|length > 0 %}
             {% for u in users %}
               <tr>
-                <td>
-                  {{ u.user_id }}
-                  <input type="hidden" name="user_id[]" value="{{ u.user_id }}">
-                </td>
-                <td>{{ u.role }}</td>
                 <td>{{ u.pr_code or '' }}</td>
-                <td>{{ u.nickname }} ... {{ u.first_name }}</td>
+                <td>{{ u.nickname }} -- {{ u.first_name }}</td>
 
                 <!-- แต่ละฟิลด์ ลากให้กว้างได้, พร้อมค่าเดิม -->
                 <td>

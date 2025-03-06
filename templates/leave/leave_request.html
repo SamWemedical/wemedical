@@ -22,8 +22,20 @@
       text-align: center;
       padding: 12px;
     }
-    .btn-primary, .btn-secondary {
+    .btn-success {
       width: 100%;
+    }
+    .btn-leave {
+      background-color: #6610f2;
+      color: black;
+      width: 45%;
+    }
+    .btn-leave:hover {
+      background-color: #915be8;
+      text-decoration: underline;
+    }
+    .btn-secondary {
+      width: 45%;
     }
     .info-text {
       font-size: 0.9em;
@@ -55,7 +67,7 @@
 <div class="container">
   <div class="card shadow">
     <div class="card-header">
-      <h4 class="m-0">ยื่นคำขอลา</h4>
+      <h4 class="m-0">ยื่นใบลา</h4>
     </div>
     <div class="card-body">
       {% if success_message %}
@@ -119,17 +131,18 @@
         <!-- เหตุผลการลา -->
         <div class="mb-3">
           <label for="reason" class="form-label">เหตุผลการลา:</label>
-          <textarea id="reason" name="reason" class="form-control" rows="4" required></textarea>
+          <textarea id="reason" name="reason" class="form-control" placeholder="โปรดระบุ" rows="4" required></textarea>
         </div>
 
         <!-- ปุ่มบันทึกคำขอลา -->
-        <button type="submit" class="btn btn-primary mb-3">บันทึกคำขอลา</button>
+        <button type="submit" class="btn btn-success">บันทึกคำขอลา</button>
       </form>
 
+      <hr>
       <!-- กลุ่มปุ่มนำทางเพิ่มเติม -->
       <div class="btn-group-bottom">
-        <a href="/my_leave_requests" class="btn btn-secondary">ดูคำขอลาของฉัน</a>
-        <a href="/my_leave_quota" class="btn btn-secondary">ดูสิทธิ์วันลาคงเหลือของฉัน</a>
+        <a href="/my_leave_requests" class="btn btn-leave text-white">ดูใบลางาน</a>
+        <a href="/my_leave_quota" class="btn btn-leave text-white">สิทธิ์วันลา</a>
         <a href="/dashboard" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
       </div>
 

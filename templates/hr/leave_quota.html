@@ -49,7 +49,6 @@
           <table class="table table-bordered table-hover">
             <thead class="table-secondary">
               <tr>
-                <th>UserID</th>
                 <th>ชื่อ-นามสกุล</th>
                 <th>ยอดยกมาจากปีก่อน<br>(ปัจจุบัน)</th>
                 <th>ยอดยกมาจากปีก่อน<br>(แก้ไขให้เป็น)</th>
@@ -58,8 +57,7 @@
             <tbody>
             {% for u in users %}
               <tr>
-                <td>{{ u.user_id }}</td>
-                <td>{{ u.first_name }} {{ u.last_name }}</td>
+                <td>{{ u.nickname }} -- {{ u.first_name }} {{ u.last_name }}</td>
                 <td>
                   {% set current_val = carry_forward_map.get(u.user_id, 0) %}
                   <span class="badge bg-info text-white">

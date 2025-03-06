@@ -20,8 +20,10 @@
   </style>
 </head>
 <body>
-
 <div class="container">
+
+  <h2 class="mb-4">แก้ไขวันเริ่มงานของพนักงาน</h2>
+
   <!-- Flash Message -->
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
@@ -43,18 +45,19 @@
         <table class="table table-bordered table-hover align-middle">
           <thead>
             <tr>
-              <th>#</th>
               <th>ชื่อ-นามสกุล</th>
               <th>Role</th>
-              <th>วันเริ่มงาน (Start Date)</th>
+              <th>วันเริ่มงาน (ปัจจุบัน)</th>
+              <th>แก้ไขวันเริ่มงาน</th>
             </tr>
           </thead>
           <tbody>
             {% for user in users %}
             <tr>
-              <td>{{ user.user_id }}</td>
-              <td>{{ user.first_name }} {{ user.last_name }}</td>
+              <td>{{ user.nickname }} -- {{ user.first_name }} {{ user.last_name }}</td>
               <td>{{ user.role }}</td>
+              <!-- แสดง Start Date ปัจจุบัน (อ่านอย่างเดียว) -->
+              <td>{{ user.start_date or '-' }}</td>
               <td>
                 <input type="hidden" name="user_id" value="{{ user.user_id }}">
                 <input type="date" class="form-control" name="start_date" value="{{ user.start_date or '' }}">
@@ -65,7 +68,7 @@
         </table>
         <div class="text-end mt-3">
           <button type="submit" class="btn btn-success">บันทึกทั้งหมด</button>
-          <a href="/hr" class="btn btn-secondary">ย้อนกลับ</a>
+          <a href="/dashboard" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
         </div>
       </form>
     </div>

@@ -41,8 +41,21 @@
       color: inherit;
     }
     .list-group-item a:hover {
+      background-color: #eb5e6c;
       color: #007bff;
       text-decoration: underline;
+    }
+    .btn-user {
+      background-color: #2ed03e;
+      width: 300px;
+    }
+    .btn-salary {
+      background-color: #2e2ed0;
+      width: 300px;
+    }
+    .btn-summary {
+      background-color: #d02ecd;
+      width: 300px;
     }
     .fw-bold {
       font-weight: bold;
@@ -64,38 +77,38 @@
       <ul class="list-group mb-3">
         <!-- หมวดหมู่: การจัดการผู้ใช้ -->
         <li class="list-group-item card-top text-white fw-bold">User Management</li>
-        <li class="list-group-item"><a href="/admin/manage_users">Manage Users (Add,Delete)</a></li>
-        <li class="list-group-item"><a href="/admin/add_subcategory">เพิ่ม Subcategories</a></li>
-        <li class="list-group-item"><a href="/admin/manage_subcat_access">Subcat Access</a></li>
-        <li class="list-group-item"><a href="/user/user_list">Users Details</a></li>
-        <li class="list-group-item"><a href="/hr/manage_pr_codes">แก้ไขรหัส PR</a></li>
-        <li class="list-group-item"><a href="/admin/change_code">Join Code</a></li>
-        <li class="list-group-item"><a href="/admin/workflow_config">Workflow Config</a></li>
-        <li class="list-group-item"><a href="/doctor_database">Doctors</a></li>
-        <li class="list-group-item"><a href="/procedures">Procedures</a></li>
-        <li class="list-group-item"><a href="/admin/commission_users">Commision Rate</a></li>
-        <li class="list-group-item"><a href="/incentive_users">ตั้งค่า Incentive</a></li>
-        <li class="list-group-item"><a href="/aes_commission_rate">ตั้งค่ามือ AES</a></li>
+        <li class="list-group-item"><a href="/admin/manage_users" class="btn btn-user text-white">Manage Users (Add,Delete)</a></li>
+        <li class="list-group-item"><a href="/admin/add_subcategory" class="btn btn-user text-white">เพิ่ม Subcategories</a></li>
+        <li class="list-group-item"><a href="/admin/manage_subcat_access" class="btn btn-user text-white">Subcat Access</a></li>
+        <li class="list-group-item"><a href="/user/user_list" class="btn btn-user text-white">Users Details</a></li>
+        <li class="list-group-item"><a href="/hr/manage_pr_codes" class="btn btn-user text-white">แก้ไขรหัส PR</a></li>
+        <li class="list-group-item"><a href="/admin/change_code" class="btn btn-user text-white">Join Code</a></li>
+        <li class="list-group-item"><a href="/admin/workflow_config" class="btn btn-user text-white">Workflow Config</a></li>
+        <li class="list-group-item"><a href="/doctor_database" class="btn btn-user text-white">Doctors</a></li>
+        <li class="list-group-item"><a href="/procedures" class="btn btn-user text-white">Procedures</a></li>
+        <li class="list-group-item"><a href="/admin/commission_users" class="btn btn-user text-white">Commision Rate</a></li>
+        <li class="list-group-item"><a href="/incentive_users" class="btn btn-user text-white">Incentive Rate</a></li>
+        <li class="list-group-item"><a href="/aes_commission_rate" class="btn btn-user text-white">ตั้งค่ามือ AES</a></li>
 
         <!-- หมวดหมู่: เงินเดือนและสวัสดิการ -->
         <li class="list-group-item card-top text-white fw-bold">Salary & Payslip</li>
-        <li class="list-group-item"><a href="/admin/salary_overview">[Salary] Overview</a></li>
-        <li class="list-group-item"><a href="/hr/salary_setup">[Salary] Setup</a></li>
-        <li class="list-group-item"><a href="/hr/insurance_fund_add">[Insurance] Setup</a></li>
-        <li class="list-group-item"><a href="/hr/edit_insurance_config">[Insurance] Monthly Deduction</a></li>
-        <li class="list-group-item"><a href="/hr/insurance_fund_form">[Insurance] History</a></li>
-        <li class="list-group-item"><a href="/hr/payday_config" class="menu-title">แก้ไขวันที่ สลิปเงินเดือน และค่าคอมฯ</a></li>
-        <li class="list-group-item"><a href="/translate_commission">(PA) แปลบทความ</a></li>
-        <li class="list-group-item"><a href="/aes_commission">(OR) บันทึกค่ามือ AES รายวัน</a></li>
-        <li class="list-group-item"><a href="/credit_commission">(MKT) เครดิต</a></li>
+        <li class="list-group-item"><a href="/admin/salary_overview" class="btn btn-salary text-white">[Salary] Overview</a></li>
+        <li class="list-group-item"><a href="/admin/salary_setup" class="btn btn-salary text-white">[Salary] Setup</a></li>
+        <li class="list-group-item"><a href="/hr/insurance_fund_add" class="btn btn-salary text-white">[Insurance] Setup</a></li>
+        <li class="list-group-item"><a href="/hr/edit_insurance_config" class="btn btn-salary text-white">[Insurance] Monthly Deduction</a></li>
+        <li class="list-group-item"><a href="/hr/insurance_fund_form" class="btn btn-salary text-white">[Insurance] History</a></li>
+        <li class="list-group-item"><a href="/hr/payday_config" class="btn btn-salary text-white">แก้ไขวันที่ สลิปเงินเดือน และค่าคอมฯ</a></li>
+        <li class="list-group-item"><a href="/translate_commission" class="btn btn-salary text-white">(PA) แปลบทความ</a></li>
+        <li class="list-group-item"><a href="/aes_commission" class="btn btn-salary text-white">(OR) บันทึกค่ามือ AES รายวัน</a></li>
+        <li class="list-group-item"><a href="/credit_commission" class="btn btn-salary text-white">(MKT) เครดิต</a></li>
 
         <!-- หมวดหมู่: สรุปยอดรายเดือน -->
         <li class="list-group-item card-top text-white fw-bold">Summary</li>
-        <li class="list-group-item"><a href="/daily_income">Daily Income</a></li>
-        <li class="list-group-item"><a href="/admin/monthly_sales">สรุปยอด PR รายเดือน</a></li>
-        <li class="list-group-item"><a href="/admin/monthly_sales_details">สรุปยอด PR รายเดือน (ละเอียด)</a></li>
-        <li class="list-group-item"><a href="/payroll_summary_all">Payroll Summary</a></li>
-        <li class="list-group-item"><a href="/hr/summary_form2">มาสาย + OT</a></li>
+        <li class="list-group-item"><a href="/daily_income" class="btn btn-summary text-white">Daily Income</a></li>
+        <li class="list-group-item"><a href="/admin/doctor_income_summary" class="btn btn-summary text-white">Monthly DF</a></li>
+        <li class="list-group-item"><a href="/admin/monthly_sales" class="btn btn-summary text-white">Monthly PR</a></li>
+        <li class="list-group-item"><a href="/payroll_summary_all" class="btn btn-summary text-white">Payroll</a></li>
+        <li class="list-group-item"><a href="/hr/ot_summary_step1" class="btn btn-summary text-white">Late & OT</a></li>
 
         <!-- หมวดหมู่: การจัดการคนไข้ -->
         <li class="list-group-item card-top text-white fw-bold">Patient Management</li>

@@ -32,9 +32,9 @@
   <table class="table table-bordered table-hover align-middle">
     <thead>
       <tr>
-        <th>User (pr_code + name)</th>
+        <th>User</th>
         <th>Category</th>
-        <th>Procedure Name</th>
+        <th>Procedure</th>
         <th class="text-end">ยอดขาย (บาท)</th>
         <th class="text-end">จำนวนเคส</th>
       </tr>
@@ -43,7 +43,7 @@
       {% for row in list_rows %}
       <tr>
         <td>
-          <strong>{{ row.user_pr_code }}</strong><br>
+          <strong>{{ row.user_pr_code }}</strong> -- {{ row.user_nickname }}<br>
           {{ row.user_name }} ({{ row.user_role }})
         </td>
         <td>{{ row.category }}</td>

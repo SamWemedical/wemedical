@@ -90,7 +90,7 @@
             {% for user in pending_users %}
             <tr>
               <td>{{ loop.index }}</td>
-              <td>{{ user.first_name }} {{ user.last_name }}</td>
+              <td>{{ user.nickname }} -- {{ user.first_name }} {{ user.last_name }}</td>
               <td>{{ user.role }}</td>
               <td>
                 <form method="POST" style="display:inline;" onsubmit="return confirm('ต้องการอนุมัติผ่านโปรให้ {{ user.first_name }} {{ user.last_name }} หรือไม่?');">
@@ -132,7 +132,7 @@
             {% for u in trial_users %}
             <tr>
               <td>{{ loop.index }}</td>
-              <td>{{ u.first_name }} {{ u.last_name }}</td>
+              <td>{{ u.nickname }} -- {{ u.first_name }} {{ u.last_name }}</td>
               <td>{{ u.role }}</td>
               <td>พนักงานทดลองงาน</td>
             </tr>
@@ -161,7 +161,7 @@
             {% for u in permanent_users %}
             <tr>
               <td>{{ loop.index }}</td>
-              <td>{{ u.first_name }} {{ u.last_name }}</td>
+              <td>{{ u.nickname }} -- {{ u.first_name }} {{ u.last_name }}</td>
               <td>{{ u.role }}</td>
               <td>พนักงานประจำ</td>
             </tr>

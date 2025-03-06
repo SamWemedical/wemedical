@@ -53,12 +53,12 @@
         {% for emp in employees %}
           <tr>
             <td>{{ emp.user_id }}</td>
-            <td>{{ emp.first_name }} {{ emp.last_name }}</td>
+            <td>{{ emp.nickname }} -- {{ emp.first_name }} {{ emp.last_name }}</td>
             <td>
               {% if emp.pr_code %}
                 {{ emp.pr_code }}
               {% else %}
-                <span class="text-muted">(No PR code)</span>
+                <span class="text-muted">-</span>
               {% endif %}
             </td>
             <td>
@@ -69,7 +69,7 @@
                        name="pr_code" 
                        value="{{ emp.pr_code or '' }}"
                        style="width:120px;"
-                       placeholder="new PR code">
+                       placeholder="-- ใส่รหัส --">
                 <button type="submit" class="btn btn-sm btn-primary">Update</button>
               </form>
             </td>

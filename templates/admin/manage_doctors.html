@@ -1,0 +1,94 @@
+<!-- templates/admin/manage_doctors.html -->
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Manage Doctors</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container my-4">
+  <h2>Manage Doctors</h2>
+
+  <!-- ตัวอย่าง flash message -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+      <div class="alert alert-{{ category }}">
+        {{ message }}
+      </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <table class="table table-bordered table-hover">
+    <thead class="table-light">
+      <tr>
+        <th>User ID</th>
+        <th>Name</th>
+        <th>Role</th>
+        <th>Doctor Link</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td>{{ u.user_id }}</td>
+        <td>{{ u.first_name }} {{ u.last_name }}</td>
+        <td>
+          <!-- แสดง role -->
+          {{ u.role }}
+          <form method="POST" class="d-flex mt-1">
+            <input type="hidden" name="action_type" value="update_role">
+            <input type="hidden" name="user_id" value="{{ u.user_id }}">
+            <select name="role" class="form-select form-select-sm me-2" style="width:auto;">
+              <option value="EMPLOYEE" {% if u.role=='EMPLOYEE'%}selected{% endif %}>EMPLOYEE</option>
+              <option value="DOCTOR" {% if u.role=='DOCTOR'%}selected{% endif %}>DOCTOR</option>
+              <option value="MANAGER" {% if u.role=='MANAGER'%}selected{% endif %}>MANAGER</option>
+              <option value="ADMIN" {% if u.role=='ADMIN'%}selected{% endif %}>ADMIN</option>
+            </select>
+            <button type="submit" class="btn btn-sm btn-primary">Update</button>
+          </form>
+        </td>
+        <td>
+          <!-- แสดง doctor_id -->
+          {{ u.doctor_id or 'NULL' }} - {{ u.doctor_name or '' }}
+          <form method="POST" class="d-flex mt-1">
+            <input type="hidden" name="action_type" value="update_doctor_id">
+            <input type="hidden" name="user_id" value="{{ u.user_id }}">
+            <select name="doctor_id" class="form-select form-select-sm me-2" style="width:auto;">
+              <option value="">(No Doctor)</option>
+              {% for doc in doctors %}
+                <option value="{{ doc.doctor_id }}"
+                  {% if doc.doctor_id == u.doctor_id %} selected{% endif %}
+                >
+                  {{ doc.thai_full_name }} ({{ doc.license_number }})
+                </option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-warning">Map</button>
+          </form>
+        </td>
+        <td>
+          <!-- ตัวอย่างปุ่มลบผู้ใช้ -->
+          <form method="POST" action="/admin/delete_user/{{ u.user_id }}" onsubmit="return confirm('ยืนยันลบผู้ใช้นี้?');">
+            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if users|length == 0 %}
+      <tr>
+        <td colspan="5" class="text-center text-muted">No users</td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+  <a href="/dashboard" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
