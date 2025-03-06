@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, make_response, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, make_response, flash, jsonify, Blueprint
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from datetime import datetime, date, timedelta
@@ -7,21 +7,32 @@ from io import StringIO
 from functools import wraps
 from collections import OrderedDict, defaultdict
 import sqlite3
+import math
 import pytz
 import csv
 import locale
 import json
 import calendar
 
-locale.setlocale(locale.LC_TIME, "th_TH.UTF-8")  # ตั้งค่า locale สำหรับภาษาไทย
+from db import get_db_connection
+from auth_decorators import role_required
+
+locale.setlocale(locale.LC_TIME, "Thai_Thailand.874")
 
 app = Flask(__name__)
 app.secret_key = "secret_key"
 
-def get_db_connection():
-    conn = sqlite3.connect('WEmedical.db', timeout=10)  # รอสูงสุด 10 วินาที
-    conn.row_factory = sqlite3.Row
-    return conn
+
+from doctor import doctor_bp
+app.register_blueprint(doctor_bp)
+doctor_bp = Blueprint('doctor_bp', __name__)
+
+from admin import admin_bp
+app.register_blueprint(admin_bp)
+admin_bp = Blueprint('admin_bp', __name__)
+
+
+
 
 
 # Initialize
@@ -58,6 +69,7 @@ def init_db():
             education_institution TEXT,
             probation BOOLEAN DEFAULT 1,  -- 1 ยังไม่ผ่านโปร, 0 ผ่านโปรแล้ว
             festival_option INTEGER DEFAULT 1,
+            doctor_id INTEGER,
             incentive_sx_rate REAL DEFAULT 0, -- ส่วนคิดค่าคอมฯ
             incentive_aes_rate REAL DEFAULT 0,
             incentive_afc_rate REAL DEFAULT 0,
@@ -75,6 +87,7 @@ def init_db():
             FOREIGN KEY (sub_category_id) REFERENCES sub_categories(sub_category_id)
         );
     """)
+
 
     # customers
     conn.execute("""
@@ -875,20 +888,6 @@ def get_allowed_employee_subcategories(manager_subcat_id):
     conn.close()
     # คืนค่าเป็น list ของตัวเลขหรือ string (ขึ้นอยู่กับการเก็บใน DB)
     return [row['child_subcat_id'] for row in rows]
-
-
-# ตรวจสอบสิทธิ์การใช้งาน
-def role_required(*roles):
-    def decorator(f):
-        @wraps(f)
-        def wrapper(*args,**kwargs):
-            if 'role' not in session:
-                return "ไม่มีสิทธิ์ (ยังไม่ได้ล็อกอิน)"
-            if session['role'] not in roles:
-                return "ไม่มีสิทธิ์ (role นี้ไม่อนุญาต)"
-            return f(*args,**kwargs)
-        return wrapper
-    return decorator
 
 
 # คำนวณ อายุงาน
@@ -2932,124 +2931,6 @@ def dashboard():
         return "บทบาทของคุณไม่มีสิทธิ์เข้าถึงแดชบอร์ด กรุณาติดต่อผู้ดูแลระบบ"
 
 
-### -------------------------------
-### System Management
-### -------------------------------
-# Workflow Config
-@app.route('/admin/workflow_config', methods=['GET', 'POST'])
-@role_required('ADMIN')
-def workflow_config_dashboard():
-    conn = get_db_connection()
-    try:
-        if request.method == 'POST':
-            # รับข้อมูลจากฟอร์มสำหรับแต่ละ configuration row
-            config_id = request.form.get('config_id')
-            require_subcategory = request.form.get('require_subcategory', '0')
-            # รับค่าใหม่จาก multi-select ที่ชื่อ new_allowed_subcategory_ids
-            new_allowed_list = request.form.getlist('new_allowed_subcategory_ids')
-            description = request.form.get('description', '')
-            
-            # ดึงค่าที่มีอยู่ในปัจจุบันของ allowed_subcategory_ids จากตาราง workflow_config
-            current_row = conn.execute("""
-                SELECT allowed_subcategory_ids 
-                FROM workflow_config 
-                WHERE config_id = ?
-            """, (config_id,)).fetchone()
-            current_allowed = []
-            if current_row and current_row['allowed_subcategory_ids']:
-                # แปลง string เป็น list โดยใช้ comma เป็นตัวแบ่ง
-                current_allowed = [x.strip() for x in current_row['allowed_subcategory_ids'].split(',') if x.strip()]
-            
-            # รวมค่าใหม่กับค่าเดิม (โดยไม่ให้เกิด duplicate)
-            combined_allowed = list(set(current_allowed + new_allowed_list))
-            # เรียงลำดับตัวเลข (ถ้าต้องการ)
-            combined_allowed.sort(key=int)
-            # รวมค่ากลับเป็น string ที่ใช้ comma เป็นตัวแบ่ง
-            new_allowed_subcategory_ids = ",".join(combined_allowed)
-            
-            conn.execute("""
-                UPDATE workflow_config
-                SET require_subcategory = ?,
-                    allowed_subcategory_ids = ?,
-                    description = ?
-                WHERE config_id = ?
-            """, (int(require_subcategory), new_allowed_subcategory_ids, description, config_id))
-            conn.commit()
-            flash("ปรับปรุง Workflow Configuration สำเร็จ", "success")
-            return redirect(url_for('workflow_config_dashboard'))
-        else:
-            # GET: ดึงข้อมูล configuration ทั้งหมดเรียงตาม config_id จากน้อยไปมาก
-            configs = conn.execute("""
-                SELECT * FROM workflow_config
-                ORDER BY config_id ASC
-            """).fetchall()
-            # ดึงข้อมูล subcategories ทั้งหมด
-            subcategories = conn.execute("""
-                SELECT sub_category_id, sub_category_name
-                FROM sub_categories
-                ORDER BY sub_category_name ASC
-            """).fetchall()
-            
-            # แปลงข้อมูลในแต่ละ configuration ให้มี key allowed_list เป็นลิสต์
-            configs_processed = []
-            for config in configs:
-                allowed_list = []
-                if config['allowed_subcategory_ids']:
-                    allowed_list = [s.strip() for s in config['allowed_subcategory_ids'].split(',') if s.strip()]
-                config_dict = dict(config)
-                config_dict['allowed_list'] = allowed_list
-                configs_processed.append(config_dict)
-            
-            return render_template('admin/workflow_config_dashboard.html', 
-                                   configs=configs_processed, 
-                                   subcategories=subcategories)
-    except Exception as e:
-        conn.rollback()
-        flash(f"เกิดข้อผิดพลาดในการอัปเดต: {e}", "danger")
-        return redirect(url_for('workflow_config_dashboard'))
-    finally:
-        conn.close()
-
-# Workflow Config; Delete allowed subcategory
-@app.route('/admin/delete_allowed_subcategory', methods=['POST'])
-@role_required('ADMIN')
-def delete_allowed_subcategory():
-    config_id = request.form.get('config_id')
-    subcat_id = request.form.get('sub_category_id')
-    if not config_id or not subcat_id:
-        flash("Missing parameters for deletion", "danger")
-        return redirect(url_for('workflow_config_dashboard'))
-    conn = get_db_connection()
-    try:
-        row = conn.execute("""
-            SELECT allowed_subcategory_ids 
-            FROM workflow_config 
-            WHERE config_id = ?
-        """, (config_id,)).fetchone()
-        if not row:
-            flash("Configuration not found", "danger")
-            return redirect(url_for('workflow_config_dashboard'))
-        current_allowed = []
-        if row['allowed_subcategory_ids']:
-            current_allowed = [x.strip() for x in row['allowed_subcategory_ids'].split(',') if x.strip()]
-        if subcat_id in current_allowed:
-            current_allowed.remove(subcat_id)
-        new_allowed = ",".join(current_allowed)
-        conn.execute("""
-            UPDATE workflow_config
-            SET allowed_subcategory_ids = ?
-            WHERE config_id = ?
-        """, (new_allowed, config_id))
-        conn.commit()
-        flash("ลบ Allowed Subcategory สำเร็จ", "success")
-    except Exception as e:
-        conn.rollback()
-        flash(f"เกิดข้อผิดพลาดในการลบ: {e}", "danger")
-    finally:
-        conn.close()
-    return redirect(url_for('workflow_config_dashboard'))
-
-
 
 ### -------------------------------
 ### User Management
@@ -3299,10 +3180,10 @@ def set_employee_start_date():
     else:
         # GET => ดึงพนักงานทั้งหมด (ยกเว้น Admin) มาแสดง
         users = conn.execute("""
-            SELECT user_id, first_name, last_name, role, start_date
+            SELECT user_id, first_name, last_name, nickname, role, start_date
             FROM users
             WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
-            ORDER BY user_id
+            ORDER BY start_date
         """).fetchall()
         conn.close()
 
@@ -3327,17 +3208,17 @@ def approve_probation():
     else:
         # Query pending employees (those still in probation)
         pending_users = conn.execute("""
-            SELECT user_id, first_name, last_name, role
+            SELECT user_id, first_name, last_name, nickname, role
             FROM users
             WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY') AND probation = 1
         """).fetchall()
 
         # Query all employees (excluding admin) for grouping
         all_users = conn.execute("""
-            SELECT first_name, last_name, role, probation
+            SELECT first_name, last_name, role, probation, nickname, start_date
             FROM users
             WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
-            ORDER BY last_name, first_name
+            ORDER BY start_date
         """).fetchall()
         conn.close()
 
@@ -3382,7 +3263,7 @@ def user_list():
             SELECT u.*, sc.sub_category_name
             FROM users u
             LEFT JOIN sub_categories sc ON u.sub_category_id = sc.sub_category_id
-            ORDER BY u.user_id
+            ORDER BY u.start_date
         """).fetchall()
     
     elif current_role == 'HR':
@@ -3392,7 +3273,7 @@ def user_list():
             FROM users u
             LEFT JOIN sub_categories sc ON u.sub_category_id = sc.sub_category_id
             WHERE u.role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
-            ORDER BY u.user_id
+            ORDER BY u.start_date
         """).fetchall()
 
     elif current_role == 'MANAGER':
@@ -3416,7 +3297,7 @@ def user_list():
                 LEFT JOIN sub_categories sc ON u.sub_category_id = sc.sub_category_id
                 WHERE u.sub_category_id IN ({placeholders})
                   AND u.role in ('EMPLOYEE', 'MANAGER')  -- สมมติ MANAGER ไม่เห็น ADMIN
-                ORDER BY u.user_id
+                ORDER BY u.start_date
             """
             rows = conn.execute(sql, child_ids).fetchall()
         else:
@@ -3503,7 +3384,7 @@ def manage_pr_codes():
 
         # ตรวจสอบว่าผู้ใช้มีอยู่จริง
         user = conn.execute("""
-            SELECT user_id, first_name, last_name, pr_code
+            SELECT user_id, first_name, last_name, nickname, pr_code
             FROM users
             WHERE user_id = ?
         """, (user_id,)).fetchone()
@@ -3531,10 +3412,10 @@ def manage_pr_codes():
 
     # GET หรือหลัง POST เสร็จ: ดึงรายการพนักงานทั้งหมด
     employees = conn.execute("""
-        SELECT user_id, first_name, last_name, pr_code
+        SELECT user_id, first_name, last_name, nickname, pr_code, start_date
         FROM users
         WHERE role IN ('EMPLOYEE','MANAGER', 'OPD')
-        ORDER BY user_id
+        ORDER BY start_date
     """).fetchall()
 
     conn.close()
@@ -4047,6 +3928,8 @@ def salary_overview():
        u.user_id, 
        u.first_name, 
        u.last_name,
+       u.nickname,
+       u.start_date,
        COALESCE(sr.base_salary, 0) AS base_salary,
        COALESCE(sr.daily_wage, 0)  AS daily_wage,
        COALESCE(sr.hourly_wage, 0) AS hourly_wage,
@@ -4062,7 +3945,7 @@ def salary_overview():
        ) s2 ON s1.user_id = s2.user_id AND s1.salary_id = s2.max_id
     ) sr ON sr.user_id = u.user_id
     WHERE u.role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
-    ORDER BY u.user_id
+    ORDER BY u.start_date
     """).fetchall()
 
     conn.close()
@@ -4173,13 +4056,48 @@ def delete_doctor(doctor_id):
 ### -------------------------------------------
 ### Check In & Out
 ### -------------------------------------------
+def calculate_distance(lat1, lon1, lat2, lon2):
+    """
+    คำนวณระยะทางระหว่างสองจุดบนพื้นโลกโดยใช้สูตร Haversine
+    คืนค่าเป็นเมตร
+    """
+    R = 6371000  # รัศมีโลก (เมตร)
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+    a = math.sin(delta_phi/2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    d = R * c
+    return d
+
+# Check In & Out (WE clinic GPS)
 @app.route('/check_in_out', methods=['GET', 'POST'])
-@role_required('EMPLOYEE','HR','MANAGER', 'SECRETARY')
+@role_required('EMPLOYEE', 'HR', 'MANAGER', 'SECRETARY')
 def check_in_out():
     user_id = session['user_id']
+    nickname = session.get('nickname')
+    first_name = session.get('first_name')
     conn = get_db_connection()
 
     if request.method == 'POST':
+        # ตรวจสอบตำแหน่งที่ส่งมาจากฟรอนต์เอนด์ (latitude, longitude)
+        try:
+            device_lat = float(request.form.get('latitude'))
+            device_lng = float(request.form.get('longitude'))
+        except (TypeError, ValueError):
+            conn.close()
+            return "ไม่สามารถตรวจสอบตำแหน่งที่ตั้งได้ กรุณาลองใหม่อีกครั้ง"
+
+        # กำหนดตำแหน่งของคลินิก # WE Clinic
+        CLINIC_LAT = 13.787791782463486  
+        CLINIC_LNG = 100.54715289024793
+
+        distance = calculate_distance(device_lat, device_lng, CLINIC_LAT, CLINIC_LNG)
+        if distance > 30:
+            conn.close()
+            return f"ตำแหน่งของคุณอยู่ห่างจากคลินิก {distance:.1f} เมตร ซึ่งเกินขีดจำกัด 30 เมตร กรุณาอยู่ใกล้คลินิกเพื่อบันทึกเวลาเข้าออกงาน"
+
         action = request.form.get('action')
         row = conn.execute("""
             SELECT *
@@ -4190,17 +4108,14 @@ def check_in_out():
         """, (user_id,)).fetchone()
 
         if action == 'checkin':
-            # กำหนดเวลาและวันที่ปัจจุบันในโซน Asia/Bangkok
             tz = pytz.timezone('Asia/Bangkok')
             now_dt = datetime.now(tz)
             today_str = now_dt.strftime('%Y-%m-%d')
             
-            # ถ้ามี record ล่าสุดของวันนี้ที่ยังไม่มี checkout ให้แจ้ง error
             if row and row['work_date'] == today_str and row['checkout_time'] is None:
                 conn.close()
                 return "คุณยังไม่ได้บันทึกเวลาเลิกงานครั้งที่แล้ว"
 
-            # บันทึกเวลาเข้างานใหม่ (สำหรับวันที่ปัจจุบัน)
             now_str = now_dt.strftime('%Y-%m-%d %H:%M:%S')
             wdate = today_str
 
@@ -4225,7 +4140,6 @@ def check_in_out():
                 user_role = session.get('role')
                 current_subcat = session.get('sub_category_id')
                 
-                # กำหนดสถานะ OT ตามเงื่อนไข:
                 if ot_reason:
                     if user_role == 'HR' or (user_role.startswith("MANAGER") and str(current_subcat) != "3"):
                         ot_status = 'pending_final'
@@ -4234,8 +4148,6 @@ def check_in_out():
                 else:
                     ot_status = 'normal'
                 
-                # ดึงค่า planned_start_time และ planned_end_time จากตาราง work_schedules
-                # โดยใช้ work_date จาก record ที่ได้จาก attendance
                 work_date = row['work_date']
                 schedule_row = conn.execute("""
                     SELECT planned_start_time, planned_end_time 
@@ -4244,16 +4156,13 @@ def check_in_out():
                 """, (user_id, work_date)).fetchone()
                 
                 if schedule_row:
-                    planned_start = schedule_row['planned_start_time']  # ตัวอย่างเช่น "08:30"
-                    planned_end = schedule_row['planned_end_time']       # ตัวอย่างเช่น "17:30"
+                    planned_start = schedule_row['planned_start_time']
+                    planned_end = schedule_row['planned_end_time']
                 else:
-                    # ถ้าไม่พบข้อมูลใน work_schedules ให้ใช้ค่า default
-                    planned_start = "08:30"
-                    planned_end = "17:30"
+                    planned_start = "10:30"
+                    planned_end = "19:30"
                 
-                # คำนวณ late_minutes โดยใช้ checkin_time จาก record
                 late_minutes = calculate_late_minutes(planned_start, row['checkin_time'])
-                # คำนวณ OT split โดยใช้ planned_end และ checkout_time ที่เพิ่งเกิดขึ้น (now_str)
                 ot_before_midnight, ot_after_midnight = calculate_ot_split(planned_end, now_str)
                 
                 conn.execute("""
@@ -4269,7 +4178,6 @@ def check_in_out():
                 conn.commit()
                 
                 if ot_reason:
-                    # ส่งแจ้งเตือนไปยัง Manager (General)
                     if user_role.startswith("MANAGER") and str(current_subcat) != "3":
                         approver_id = get_parent_manager_for_employee(current_subcat)
                     else:
@@ -4278,12 +4186,12 @@ def check_in_out():
                     if approver_id is None:
                         flash("ไม่พบหัวหน้าแผนกสำหรับคำขอ OT", "warning")
                     else:
-                        add_notification(approver_id, f"มีคำขอ OT ใหม่จากผู้ใช้ {user_id} กรุณาตรวจสอบ")
+                        add_notification(approver_id, f"{nickname} -- {first_name} ขออนุมัติ OT, กรุณาตรวจสอบ")
                 conn.close()
                 
                 return render_template('check_in_out/after_action.html',
-                                    message="บันทึกเวลาเลิกงานเรียบร้อย" + (" (OT pending)" if ot_reason else ""),
-                                    return_url=url_for('check_in_out'))
+                                       message="บันทึกเวลาเลิกงานเรียบร้อย" + (" (OT pending)" if ot_reason else ""),
+                                       return_url=url_for('check_in_out'))
             else:
                 conn.close()
                 return "ไม่พบรายการที่ยังไม่บันทึกเวลาเลิกงาน"
@@ -4291,7 +4199,6 @@ def check_in_out():
             conn.close()
             return "ไม่พบการกระทำที่รองรับ"
     else:
-        # GET -> แสดงหน้า check_in_out
         row = conn.execute("""
             SELECT *
             FROM attendance
@@ -4305,9 +4212,7 @@ def check_in_out():
         now_dt = datetime.now(tz)
         today_str = now_dt.strftime('%Y-%m-%d')
 
-        # ฟังก์ชันช่วยสำหรับตรวจสอบว่าเวลาที่เก็บใน record อยู่ในช่วงรับรองหรือไม่
         def within_grace_period(check_time_str):
-            # สมมติช่วงรับรองคือ 00:00 - 06:00 น.
             try:
                 check_dt = datetime.strptime(check_time_str, '%Y-%m-%d %H:%M:%S')
                 hour = check_dt.hour
@@ -4315,8 +4220,6 @@ def check_in_out():
             except Exception:
                 return False
 
-        # ถ้าไม่มี record หรือ record ล่าสุดไม่ใช่ของวันนี้
-        # หรือ record ล่าสุดมี checkout_time แล้ว (หรือถ้า checkout_time อยู่ในช่วง grace period ให้ถือว่าเป็นเช็คเอาต์แล้ว)
         if not row or row['work_date'] != today_str or (row['checkout_time'] is not None and not within_grace_period(row['checkout_time'])):
             status = 'ready_to_checkin'
             checkin_time = None
@@ -4325,6 +4228,98 @@ def check_in_out():
             checkin_time = row['checkin_time']
 
         return render_template('check_in_out/check_in_out.html', status=status, checkin_time=checkin_time)
+
+# My OT Summary
+@app.route('/ot_summary', methods=['GET', 'POST'])
+@role_required('EMPLOYEE', 'HR', 'MANAGER', 'SECRETARY')
+def ot_summary():
+    """
+    สรุปเวลาทำงานของตัวเอง พร้อมตัวเลือกเดือนปัจจุบันและเดือนที่แล้ว
+    """
+    from datetime import datetime
+    from calendar import monthrange
+
+    # ดึงค่าเดือนและปีจาก POST หรือใช้ค่าเริ่มต้น (เดือนปัจจุบัน)
+    if request.method == 'POST':
+        year = int(request.form.get('year'))
+        month = int(request.form.get('month'))
+    else:
+        today = datetime.today()
+        year = today.year
+        month = today.month
+
+    # ดึง user_id จาก session
+    user_id = session['user_id']
+    conn = get_db_connection()
+    num_days = monthrange(year, month)[1]
+
+    summary_data = []
+    total_late = 0
+    total_ot_before = 0
+    total_ot_after = 0
+
+    for day in range(1, num_days + 1):
+        date_str = f"{year:04d}-{month:02d}-{day:02d}"
+
+        # ดึง Work Schedule
+        row_sch = conn.execute("""
+            SELECT planned_start_time, planned_end_time
+            FROM work_schedules
+            WHERE user_id = ? AND work_date = ?
+        """, (user_id, date_str)).fetchone()
+
+        planned_start = row_sch['planned_start_time'] if row_sch else None
+        planned_end = row_sch['planned_end_time'] if row_sch else None
+
+        # ดึง Attendance พร้อมค่า late_minutes, ot_before_midnight, ot_after_midnight
+        row_att = conn.execute("""
+            SELECT checkin_time, checkout_time, ot_status, late_minutes, ot_before_midnight, ot_after_midnight
+            FROM attendance
+            WHERE user_id = ? AND work_date = ?
+        """, (user_id, date_str)).fetchone()
+
+        if row_att:
+            checkin_time = row_att['checkin_time']
+            checkout_time = row_att['checkout_time']
+            ot_status = row_att['ot_status']
+            # ดึงค่าจากฐานข้อมูลโดยตรง
+            late_min = row_att['late_minutes'] if row_att['late_minutes'] is not None else 0
+            ot_before = row_att['ot_before_midnight'] if row_att['ot_before_midnight'] is not None else 0
+            ot_after = row_att['ot_after_midnight'] if row_att['ot_after_midnight'] is not None else 0
+
+            total_late += late_min
+            total_ot_before += ot_before
+            total_ot_after += ot_after
+        else:
+            checkin_time = None
+            checkout_time = None
+            ot_status = None
+            late_min = 0
+            ot_before = 0
+            ot_after = 0
+
+        summary_data.append({
+            "day": day,
+            "checkin": checkin_time or '-',
+            "checkout": checkout_time or '-',
+            "ot_status": ot_status or '-',
+            "late_min": late_min,
+            "ot_before": format_hh_mm(ot_before),
+            "ot_after": format_hh_mm(ot_after),
+        })
+
+    conn.close()
+
+    return render_template(
+        'check_in_out/ot_summary.html',
+        year=year,
+        month=month,
+        summary_data=summary_data,
+        total_late=total_late,
+        total_ot_before=format_hh_mm(total_ot_before),
+        total_ot_after=format_hh_mm(total_ot_after)
+    )
+
 
 
 ### -------------------------------------------
@@ -4343,7 +4338,7 @@ def ot_approval_list():
         query = """
             SELECT a.attendance_id, a.user_id, a.checkin_time, a.checkout_time, a.work_date,
                    a.ot_status, a.ot_reason, a.ot_approve_comment,
-                   u.first_name, u.last_name
+                   u.first_name, u.last_name, u.nickname
             FROM attendance a
             JOIN users u ON a.user_id = u.user_id
             WHERE a.ot_status IN ('pending', 'pending_final', 'approved', 'rejected')
@@ -4357,7 +4352,7 @@ def ot_approval_list():
             query = """
                 SELECT a.attendance_id, a.user_id, a.checkin_time, a.checkout_time, a.work_date,
                        a.ot_status, a.ot_reason, a.ot_approve_comment,
-                       u.first_name, u.last_name
+                       u.first_name, u.last_name, u.nickname
                 FROM attendance a
                 JOIN users u ON a.user_id = u.user_id
                 WHERE a.ot_status = 'pending_final'
@@ -4374,7 +4369,7 @@ def ot_approval_list():
             query = f"""
                 SELECT a.attendance_id, a.user_id, a.checkin_time, a.checkout_time, a.work_date,
                        a.ot_status, a.ot_reason, a.ot_approve_comment,
-                       u.first_name, u.last_name
+                       u.first_name, u.last_name, u.nickname
                 FROM attendance a
                 JOIN users u ON a.user_id = u.user_id
                 WHERE a.ot_status = 'pending' 
@@ -4387,7 +4382,7 @@ def ot_approval_list():
         query = """
             SELECT a.attendance_id, a.user_id, a.checkin_time, a.checkout_time, a.work_date,
                    a.ot_status, a.ot_reason, a.ot_approve_comment,
-                   u.first_name, u.last_name
+                   u.first_name, u.last_name, u.nickname
             FROM attendance a
             JOIN users u ON a.user_id = u.user_id
             WHERE a.ot_status = 'pending'
@@ -4517,134 +4512,100 @@ def ot_approve():
 
 
 ### -------------------------------------------
-### My Summary
-### -------------------------------------------
-@app.route('/my_summary', methods=['GET', 'POST'])
-@role_required('EMPLOYEE', 'HR', 'MANAGER', 'SECRETARY')
-def my_summary():
-    """
-    สรุปเวลาทำงานของตัวเอง พร้อมตัวเลือกเดือนปัจจุบันและเดือนที่แล้ว
-    """
-    from datetime import datetime
-    from calendar import monthrange
-
-    # ดึงค่าเดือนและปีจาก POST หรือใช้ค่าเริ่มต้น (เดือนปัจจุบัน)
-    if request.method == 'POST':
-        year = int(request.form.get('year'))
-        month = int(request.form.get('month'))
-    else:
-        today = datetime.today()
-        year = today.year
-        month = today.month
-
-    # ดึง user_id จาก session
-    user_id = session['user_id']
-    conn = get_db_connection()
-    num_days = monthrange(year, month)[1]
-
-    summary_data = []
-    total_late = 0
-    total_ot_before = 0
-    total_ot_after = 0
-
-    for day in range(1, num_days + 1):
-        date_str = f"{year:04d}-{month:02d}-{day:02d}"
-
-        # ดึง Work Schedule
-        row_sch = conn.execute("""
-            SELECT planned_start_time, planned_end_time
-            FROM work_schedules
-            WHERE user_id = ? AND work_date = ?
-        """, (user_id, date_str)).fetchone()
-
-        planned_start = row_sch['planned_start_time'] if row_sch else None
-        planned_end = row_sch['planned_end_time'] if row_sch else None
-
-        # ดึง Attendance พร้อมค่า late_minutes, ot_before_midnight, ot_after_midnight
-        row_att = conn.execute("""
-            SELECT checkin_time, checkout_time, ot_status, late_minutes, ot_before_midnight, ot_after_midnight
-            FROM attendance
-            WHERE user_id = ? AND work_date = ?
-        """, (user_id, date_str)).fetchone()
-
-        if row_att:
-            checkin_time = row_att['checkin_time']
-            checkout_time = row_att['checkout_time']
-            ot_status = row_att['ot_status']
-            # ดึงค่าจากฐานข้อมูลโดยตรง
-            late_min = row_att['late_minutes'] if row_att['late_minutes'] is not None else 0
-            ot_before = row_att['ot_before_midnight'] if row_att['ot_before_midnight'] is not None else 0
-            ot_after = row_att['ot_after_midnight'] if row_att['ot_after_midnight'] is not None else 0
-
-            total_late += late_min
-            total_ot_before += ot_before
-            total_ot_after += ot_after
-        else:
-            checkin_time = None
-            checkout_time = None
-            ot_status = None
-            late_min = 0
-            ot_before = 0
-            ot_after = 0
-
-        summary_data.append({
-            "day": day,
-            "checkin": checkin_time or '-',
-            "checkout": checkout_time or '-',
-            "ot_status": ot_status or '-',
-            "late_min": late_min,
-            "ot_before": format_hh_mm(ot_before),
-            "ot_after": format_hh_mm(ot_after),
-        })
-
-    conn.close()
-
-    return render_template(
-        'user/my_summary.html',
-        year=year,
-        month=month,
-        summary_data=summary_data,
-        total_late=total_late,
-        total_ot_before=format_hh_mm(total_ot_before),
-        total_ot_after=format_hh_mm(total_ot_after)
-    )
-
-
-
-### -------------------------------------------
 ### Daily Schedule Editor (HR)
 ### -------------------------------------------
 # Step 1
-@app.route('/hr/schedule_editor', methods=['GET', 'POST'])
-@role_required('HR')
-def schedule_editor():
+@app.route('/hr/schedule_editor_step1', methods=['GET', 'POST'])
+@role_required('HR', 'MANAGER', 'ADMIN')
+def schedule_editor_step1():
+    """
+    หน้าฟอร์มให้ HR/Manager เลือกพนักงานหลายคน + ใส่ปี/เดือน
+    แล้ว POST -> ot_summary_step2
+    """
     if request.method == 'POST':
+        # รับ user_ids (list)
+        user_ids = request.form.getlist('user_ids')
         year = request.form.get('year')
         month = request.form.get('month')
-        user_ids = request.form.getlist('user_ids')
+        # รวมเป็นสตริง
         user_str = ",".join(user_ids)
-
-        return redirect(url_for('schedule_editor_detail', year=year, month=month, user_str=user_str))
-
+        return redirect(url_for('ot_summary_step2', user_str=user_str, year=year, month=month))
     else:
         conn = get_db_connection()
-        rows = conn.execute("""
-            SELECT user_id, first_name, last_name
-            FROM users
-            WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
-            ORDER BY user_id
-        """).fetchall()
+
+        # กำหนด mapping ของกลุ่ม subcategory
+        subcat_groups = {
+            'PA': (4, 9),
+            'OR': (5, 10),
+            'ADMIN_ONLINE': (6, 11),
+            'MARKETING': (7, 12),
+            'HR': (2,),
+            'SECRETARY': (16, 17)
+        }
+        
+        # สำหรับ HR ให้เห็นทุกแผนก: กำหนดพิเศษในกรณี 'ALL'
+        special_group = (2, 4, 5, 6, 7, 9, 10, 11, 12, 16, 17)
+
+        # รับค่า sub_category จาก query parameter (ค่าจะเป็น key ใน mapping หรือ 'ALL')
+        selected_subcat = request.args.get('sub_category')
+        if selected_subcat:
+            if selected_subcat.upper() == 'ALL':
+                group_tuple = special_group
+            else:
+                # ตรวจสอบว่าค่า selected_subcat อยู่ใน mapping หรือไม่
+                if selected_subcat in subcat_groups:
+                    group_tuple = subcat_groups[selected_subcat]
+                else:
+                    # หากไม่ตรงกับ mapping ให้ลองแปลงเป็น int แล้วใช้เป็นค่าเดียว
+                    try:
+                        group_tuple = (int(selected_subcat),)
+                    except ValueError:
+                        group_tuple = ()
+            if group_tuple:
+                placeholders = ','.join(['?'] * len(group_tuple))
+                query = f"""
+                    SELECT user_id, first_name, last_name, role, nickname, start_date
+                    FROM users
+                    WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
+                      AND sub_category_id IN ({placeholders})
+                    ORDER BY start_date
+                """
+                user_list = conn.execute(query, group_tuple).fetchall()
+            else:
+                user_list = []
+        else:
+            user_list = []
         conn.close()
+
+        current_year = datetime.now().year
+        years = list(range(current_year - 3, current_year + 1))
+        months = [{'value': i, 'name': f"เดือน {i}"} for i in range(1, 13)]
+
+        # สร้างรายการสำหรับ dropdown ของ subcategories โดยใช้ mapping ที่กำหนดไว้
+        sub_categories = [
+            {'id': 'ALL', 'label': 'ทุกคน'},
+            {'id': 'PA', 'label': 'PA'},
+            {'id': 'OR', 'label': 'OR'},
+            {'id': 'ADMIN_ONLINE', 'label': 'ADMIN_ONLINE'},
+            {'id': 'MARKETING', 'label': 'MARKETING'},
+            {'id': 'HR', 'label': 'HR'},
+            {'id': 'SECRETARY', 'label': 'SECRETARY'}
+        ]
 
         return render_template(
             "hr/schedule_editor_step1.html",
-            user_list=rows
+            user_list=user_list,
+            years=years,
+            current_year=current_year,
+            months=months,
+            sub_categories=sub_categories,
+            selected_subcat=selected_subcat
         )
 
 # Step 2
-@app.route('/hr/schedule_editor_detail')
+@app.route('/hr/schedule_editor_step2')
 @role_required('HR')
-def schedule_editor_detail():
+def schedule_editor_step2():
     year = int(request.args.get('year', '2025'))
     month = int(request.args.get('month', '1'))
     user_str = request.args.get('user_str', '')
@@ -4676,10 +4637,10 @@ def schedule_editor_detail():
     if user_ids:
         placeholder = ",".join("?" for _ in user_ids)
         user_rows = conn.execute(f"""
-            SELECT user_id, first_name, last_name
+            SELECT user_id, first_name, last_name, nickname, start_date
             FROM users
             WHERE user_id IN ({placeholder})
-            ORDER BY user_id
+            ORDER BY start_date
         """, tuple(user_ids)).fetchall()
 
     default_start_time="10:30"
@@ -4716,7 +4677,7 @@ def schedule_editor_detail():
     conn.commit()
     conn.close()
 
-    return render_template("hr/schedule_editor_detail.html",
+    return render_template("hr/schedule_editor_step2.html",
                            user_rows=user_rows,
                            year=year,
                            month=month,
@@ -4766,8 +4727,8 @@ def schedule_editor_save():
             recalculate_attendance(uid, date_str)
 
     flash(f"บันทึกตารางเดือน {month_int}/{year_int} เรียบร้อย", "success")
-    # หลังบันทึกเสร็จ redirect กลับไปที่ schedule_editor_detail
-    return redirect(url_for('schedule_editor_detail', year=year_int, month=month_int, user_str=user_str))
+    # หลังบันทึกเสร็จ redirect กลับไปที่ schedule_editor_step2
+    return redirect(url_for('schedule_editor_step2', year=year_int, month=month_int, user_str=user_str))
 
 # Step 4: คำนวณ Attendance ใหม่
 @app.route('/recalculate_attendance/<int:user_id>/<work_date>', methods=['POST'])
@@ -4781,49 +4742,121 @@ def recalculate_attendance_route(user_id, work_date):
 ### -------------------------------------------
 ### OT Summary (All Employee)
 ### -------------------------------------------
-@app.route('/hr/summary_form2', methods=['GET', 'POST'])
+@app.route('/hr/ot_summary_step1', methods=['GET', 'POST'])
 @role_required('HR', 'MANAGER', 'ADMIN')
-def summary_form2():
+def ot_summary_step1():
     """
     หน้าฟอร์มให้ HR/Manager เลือกพนักงานหลายคน + ใส่ปี/เดือน
-    แล้ว POST -> summary_month2
+    แล้ว POST -> ot_summary_step2
     """
     if request.method == 'POST':
         # รับ user_ids (list)
         user_ids = request.form.getlist('user_ids')
         year = request.form.get('year')
         month = request.form.get('month')
-
-        # รวมเป็นสตริง
         user_str = ",".join(user_ids)
-        # redirect ไป summary_month2
-        return redirect(url_for('summary_month2', user_str=user_str, year=year, month=month))
+        return redirect(url_for('ot_summary_step2', user_str=user_str, year=year, month=month))
     else:
-        # ดึงข้อมูลพนักงานจากฐานข้อมูล
         conn = get_db_connection()
-        rows = conn.execute("""
-            SELECT user_id, first_name, last_name, role
-            FROM users
-            WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
-            ORDER BY user_id
-        """).fetchall()
+        
+        # กำหนด mapping ของกลุ่ม subcategory
+        subcat_groups = {
+            'PA': (4, 9),
+            'OR': (5, 10),
+            'ADMIN_ONLINE': (6, 11),
+            'MARKETING': (7, 12),
+            'HR': (2,),
+            'SECRETARY': (16, 17)
+        }
+        # สำหรับ HR ให้เห็นทุกแผนก
+        special_group = (2, 4, 5, 6, 7, 9, 10, 11, 12, 16, 17)
+
+        # กำหนดรายการ dropdown ของ subcategories ตาม role
+        role = session.get('role')
+        allowed_sub_categories = []
+        if role in ('HR', 'ADMIN'):
+            allowed_sub_categories = [
+                {'id': 'ALL', 'label': 'ทุกคน'},
+                {'id': 'PA', 'label': 'PA'},
+                {'id': 'OR', 'label': 'OR'},
+                {'id': 'ADMIN_ONLINE', 'label': 'ADMIN_ONLINE'},
+                {'id': 'MARKETING', 'label': 'MARKETING'},
+                {'id': 'HR', 'label': 'HR'},
+                {'id': 'SECRETARY', 'label': 'SECRETARY'}
+            ]
+        elif role.startswith("MANAGER"):
+            # สำหรับ MANAGER ให้แสดงเฉพาะแผนกที่เกี่ยวข้องกับตัวเอง
+            manager_subcat = session.get('sub_category_id')
+            if manager_subcat in (4, 9):
+                allowed_sub_categories = [{'id': 'PA', 'label': 'PA'}]
+            elif manager_subcat in (5, 10):
+                allowed_sub_categories = [{'id': 'OR', 'label': 'OR'}]
+            elif manager_subcat in (6, 11):
+                allowed_sub_categories = [{'id': 'ADMIN_ONLINE', 'label': 'ADMIN_ONLINE'}]
+            elif manager_subcat in (7, 12):
+                allowed_sub_categories = [{'id': 'MARKETING', 'label': 'MARKETING'}]
+            elif manager_subcat in (16, 17):
+                allowed_sub_categories = [{'id': 'SECRETARY', 'label': 'SECRETARY'}]
+            else:
+                allowed_sub_categories = []  # หรืออาจแสดงเป็นว่าง
+        else:
+            allowed_sub_categories = []
+
+        # รับค่า sub_category จาก query parameter (ค่าที่เลือกจาก dropdown)
+        selected_subcat = request.args.get('sub_category')
+        if selected_subcat:
+            if role in ('HR', 'ADMIN'):
+                if selected_subcat.upper() == 'ALL':
+                    group_tuple = special_group
+                elif selected_subcat in subcat_groups:
+                    group_tuple = subcat_groups[selected_subcat]
+                else:
+                    try:
+                        group_tuple = (int(selected_subcat),)
+                    except ValueError:
+                        group_tuple = ()
+            elif role.startswith("MANAGER"):
+                # MANAGER สามารถเลือกเฉพาะตัวเลือกใน allowed_sub_categories
+                if selected_subcat in subcat_groups:
+                    group_tuple = subcat_groups[selected_subcat]
+                else:
+                    group_tuple = ()
+            else:
+                group_tuple = ()
+                
+            if group_tuple:
+                placeholders = ','.join(['?'] * len(group_tuple))
+                query = f"""
+                    SELECT user_id, first_name, last_name, role, nickname, start_date
+                    FROM users
+                    WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
+                      AND sub_category_id IN ({placeholders})
+                    ORDER BY start_date
+                """
+                user_list = conn.execute(query, group_tuple).fetchall()
+            else:
+                user_list = []
+        else:
+            user_list = []
         conn.close()
 
-        # คำนวณปีที่สามารถเลือกได้ (ปีปัจจุบันและย้อนหลัง 3 ปี)
-        from datetime import datetime
         current_year = datetime.now().year
-        years = list(range(current_year - 3, current_year + 1))  # 3 ปีย้อนหลังถึงปีปัจจุบัน
+        years = list(range(current_year - 3, current_year + 1))
+        months = [{'value': i, 'name': f"เดือน {i}"} for i in range(1, 13)]
 
         return render_template(
-            "hr/summary_form2.html",
-            user_list=rows,
+            "hr/ot_summary_step1.html",
+            user_list=user_list,
             years=years,
-            current_year=current_year
+            current_year=current_year,
+            months=months,
+            sub_categories=allowed_sub_categories,
+            selected_subcat=selected_subcat
         )
 
-@app.route('/hr/summary_month2')
+@app.route('/hr/ot_summary_step2')
 @role_required('HR', 'MANAGER', 'ADMIN')
-def summary_month2():
+def ot_summary_step2():
     """
     แสดงผลสรุปเวลาทำงาน (Attendance/OT) ของ user(s) หลายคน ในเดือน/ปี ที่กำหนด
     """
@@ -4842,7 +4875,7 @@ def summary_month2():
     users_data = []
     for uid in user_ids:
         user_row = conn.execute("""
-            SELECT first_name, last_name, role
+            SELECT first_name, last_name, nickname
             FROM users
             WHERE user_id=?
         """, (uid,)).fetchone()
@@ -4850,7 +4883,7 @@ def summary_month2():
         if not user_row:
             continue
 
-        full_name = f"{user_row['first_name']} {user_row['last_name']} ({user_row['role']})"
+        full_name = f"{user_row['nickname']} -- {user_row['first_name']} {user_row['last_name']} "
         attendance_data = []
 
         total_late = 0
@@ -4917,12 +4950,70 @@ def summary_month2():
     conn.close()
 
     return render_template(
-        "hr/summary_month2.html",
+        "hr/ot_summary_step2.html",
         users_data=users_data,
         year=year,
         month=month
     )
 
+@app.route('/hr/ot_summary_step3')
+@role_required('HR', 'MANAGER', 'ADMIN')
+def ot_summary_step3():
+    """
+    แสดงสรุปเวลาทำงานรวมของผู้ใช้ทั้งหมดในกลุ่ม subcat (2,4,5,6,7,9,10,11,12,16,17)
+    สำหรับปีปัจจุบัน ตั้งแต่เดือน 1 ถึงเดือนปัจจุบัน
+    """
+    conn = get_db_connection()
+    current_year = datetime.now().year
+    current_month = datetime.now().month
+    # กำหนดช่วงวันที่สำหรับสรุป (จาก 1 มกราคม ถึงวันสุดท้ายของเดือนปัจจุบัน)
+    start_date = f"{current_year}-01-01"
+    last_day = monthrange(current_year, current_month)[1]
+    end_date = f"{current_year}-{current_month:02d}-{last_day:02d}"
+
+    # กำหนดกลุ่ม subcat ที่ต้องการ
+    subcat_ids = (2, 4, 5, 6, 7, 9, 10, 11, 12, 16, 17)
+    placeholders = ','.join(['?'] * len(subcat_ids))
+    
+    # ดึงข้อมูลผู้ใช้จากตาราง users ที่มี sub_category_id ในกลุ่มนี้
+    users = conn.execute(f"""
+        SELECT user_id, first_name, last_name, role, nickname, start_date
+        FROM users
+        WHERE sub_category_id IN ({placeholders})
+        ORDER BY start_date
+    """, subcat_ids).fetchall()
+
+    users_data = []
+    for user in users:
+        full_name = f"{user['nickname']} -- {user['first_name']} {user['last_name']} ({user['role']})"
+        # สรุปข้อมูลจากตาราง attendance สำหรับผู้ใช้ในช่วงปีปัจจุบัน
+        row = conn.execute("""
+            SELECT 
+              IFNULL(SUM(late_minutes), 0) AS total_late,
+              IFNULL(SUM(ot_before_midnight), 0) AS total_ot_before,
+              IFNULL(SUM(ot_after_midnight), 0) AS total_ot_after
+            FROM attendance
+            WHERE user_id = ?
+              AND work_date BETWEEN ? AND ?
+        """, (user['user_id'], start_date, end_date)).fetchone()
+        total_late = row['total_late']
+        total_ot_before = row['total_ot_before']
+        total_ot_after = row['total_ot_after']
+
+        users_data.append({
+            "name": full_name,
+            "total_late": total_late,
+            "total_ot_before": format_hh_mm(total_ot_before),
+            "total_ot_after": format_hh_mm(total_ot_after)
+        })
+    conn.close()
+
+    return render_template(
+        "hr/ot_summary_step3.html",
+        users_data=users_data,
+        year=current_year,
+        month=current_month
+    )
 
 
 ### -------------------------------------------
@@ -4932,17 +5023,12 @@ def summary_month2():
 @app.route('/leave_request', methods=['GET','POST'])
 @role_required('EMPLOYEE','HR','MANAGER', 'SECRETARY')
 def leave_request():
-    """
-    ยื่นคำร้องขอลางาน โดยตรวจสอบ leftover on-the-fly
-    และในกรณีที่ผู้ใช้เป็น Manager (child) ใบลา จะถูกบันทึกสถานะเป็น 'pending_final'
-    เพื่อส่งคำขอไปยัง Manager (General) สำหรับ final approval
-    """
     success_message = None
     error_message = None
 
     user_id = session['user_id']
-    # ดึงข้อมูล role และ sub_category_id จาก session
-    current_role = session.get('role')
+    nickname = session.get('nickname')
+    first_name = session.get('first_name')
     current_subcat = session.get('sub_category_id')
 
     if request.method == 'POST':
@@ -5007,10 +5093,13 @@ def leave_request():
 
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # ตรวจสอบ role: หากเป็น Manager (child) , HR ให้เปลี่ยนสถานะเป็น 'pending_final'
-        # หากเป็น EMPLOYEE(ADMIN_ONLINE), EMPLOYEE(MARKETING), SECRETARY ASSISTANCE ให้เปลี่ยนสถานะเป็น 'pending_hr'
-        if  (current_role == 'HR') or (current_role == 'MANAGER' and str(current_subcat) != "3"):
+        # กำหนดสถานะใบลา
+        if  current_subcat in (2, 4, 5, 6, 7):
             status = 'pending_final'
+        elif current_subcat in (11, 12, 17):
+            status = 'pending_hr'
+        elif current_subcat in (3, 16):
+            status = 'pending_doctor'
         else:
             status = 'pending'
         
@@ -5023,8 +5112,8 @@ def leave_request():
         conn.commit()
         conn.close()
 
-        add_notification_for_roles(['HR', 'MANAGER'], f"พนักงาน {user_id} ยื่นคำขอลา {days_requested} วัน")
-        success_message = success_message or f"บันทึกคำขอลา {days_requested} วัน เรียบร้อย (สถานะ: {status})"
+        add_notification_for_roles(['HR', 'MANAGER'], f"{nickname} -- {first_name} ยื่นใบลา {days_requested} วัน")
+        success_message = success_message or f"บันทึก {leave_type} : {days_requested} วัน เรียบร้อย"
         return render_template('leave/leave_request.html', success_message=success_message)
     else:
         # GET: Render form โดยดึง festival_option
@@ -5047,33 +5136,26 @@ def leave_request():
 @role_required('EMPLOYEE', 'HR', 'MANAGER', 'SECRETARY')
 def my_leave_requests():
     user_id = session['user_id']
+    current_year = datetime.now().year
 
     conn = get_db_connection()
+    # ดึงเฉพาะคำขอลาที่เกิดขึ้นในปีปัจจุบัน (โดยใช้ strftime เพื่อกรองปีจาก start_date)
     leave_requests = conn.execute("""
-        SELECT leave_id, leave_type, start_date, end_date, reason, status, days_requested,
-               strftime('%Y-%m', start_date) AS request_month
+        SELECT leave_id, leave_type, start_date, end_date, reason, status, days_requested
         FROM leave_requests
-        WHERE user_id=?
+        WHERE user_id=? AND strftime('%Y', start_date)=?
         ORDER BY start_date DESC
-    """, (user_id,)).fetchall()
+    """, (user_id, str(current_year))).fetchall()
     conn.close()
 
-    # จัดกลุ่มข้อมูลตามเดือน
-    grouped_requests = {}
-    for leave in leave_requests:
-        month = leave['request_month']
-        if month not in grouped_requests:
-            grouped_requests[month] = []
-        grouped_requests[month].append(leave)
-
-    return render_template('leave/my_leave_requests.html', grouped_requests=grouped_requests)
+    return render_template('leave/my_leave_requests.html', leave_requests=leave_requests, current_year=current_year)
 
 # Edit Leave Request: พนักงานแก้ไขคำขอลา
 @app.route('/edit_leave_request/<int:leave_id>', methods=['GET', 'POST'])
 @role_required('EMPLOYEE', 'HR', 'MANAGER', 'SECRETARY')
 def edit_leave_request(leave_id):
     user_id = session['user_id']
-
+    
     conn = get_db_connection()
     leave = conn.execute("""
         SELECT leave_id, leave_type, start_date, end_date, reason, status
@@ -5082,17 +5164,44 @@ def edit_leave_request(leave_id):
     """, (leave_id, user_id)).fetchone()
 
     if not leave:
+        conn.close()
         return "ไม่พบคำขอลานี้"
 
-    if leave['status'] != 'pending':
-        return "ไม่สามารถแก้ไขคำขอลาที่อนุมัติแล้วได้"
+    # อนุญาตให้แก้ไขได้เฉพาะใบลาที่ยังอยู่ในสถานะ pending (หรือ pending อะไรก็ตาม)
+    if not leave['status'].startswith('pending'):
+        conn.close()
+        return "ไม่สามารถแก้ไขคำขอลาได้"
 
     if request.method == 'POST':
-        leave_type = request.form.get('leave_type', '')
-        start_date = request.form.get('start_date', '')
-        end_date = request.form.get('end_date', '')
-        reason = request.form.get('reason', '')
+        # รับข้อมูลจาก form พร้อมลบช่องว่างที่ไม่จำเป็น
+        leave_type = request.form.get('leave_type', '').strip()
+        start_date = request.form.get('start_date', '').strip()  # ควรอยู่ในรูปแบบ YYYY-MM-DD
+        end_date   = request.form.get('end_date', '').strip()    # ควรอยู่ในรูปแบบ YYYY-MM-DD
+        reason     = request.form.get('reason', '').strip()
 
+        # ตรวจสอบข้อมูลว่ามีครบถ้วนหรือไม่
+        if not (leave_type and start_date and end_date and reason):
+            flash("กรุณากรอกข้อมูลให้ครบถ้วน", "danger")
+            conn.close()
+            return render_template('leave/edit_leave_request.html', leave=leave)
+
+        # ตรวจสอบรูปแบบวันที่ (ควรเป็น YYYY-MM-DD)
+        try:
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+            end_dt   = datetime.strptime(end_date, '%Y-%m-%d')
+        except Exception as e:
+            flash("รูปแบบวันที่ไม่ถูกต้อง (ควรเป็น YYYY-MM-DD)", "danger")
+            conn.close()
+            return render_template('leave/edit_leave_request.html', leave=leave)
+
+        # ตรวจสอบว่าหาก start_date > end_date ให้แจ้งเตือน
+        if start_dt > end_dt:
+            flash("วันสิ้นสุดต้องไม่น้อยกว่าวันเริ่มต้น", "danger")
+            conn.close()
+            return render_template('leave/edit_leave_request.html', leave=leave)
+
+        # (หากต้องการตรวจสอบ overlap ของช่วงวันลาเพิ่มเติมก็สามารถเรียกใช้ check_leave_overlap() ที่มีอยู่)
+        # ปรับปรุงข้อมูลในฐานข้อมูลด้วยคำสั่ง UPDATE
         conn.execute("""
             UPDATE leave_requests
             SET leave_type=?, start_date=?, end_date=?, reason=?
@@ -5103,15 +5212,15 @@ def edit_leave_request(leave_id):
         return redirect('/my_leave_requests')
 
     conn.close()
+    # ในกรณี GET, ส่งข้อมูลใบลาที่ดึงมาจาก DB ไปให้ template
     return render_template('leave/edit_leave_request.html', leave=leave)
 
 # Confirm Cancel Leave Request: พนักงานยืนยัน ยกเลิกการลา
-@app.route('/confirm_cancel_leave_request/<int:leave_id>', methods=['POST'])
+@app.route('/cancel_leave_request/<int:leave_id>', methods=['POST'])
 @role_required('EMPLOYEE', 'HR', 'MANAGER', 'SECRETARY')
-def confirm_cancel_leave_request(leave_id):
+def cancel_leave_request(leave_id):
     user_id = session['user_id']
 
-    # ตรวจสอบคำขอลา
     conn = get_db_connection()
     leave = conn.execute("""
         SELECT leave_id, leave_type, start_date, end_date, reason, status
@@ -5121,14 +5230,25 @@ def confirm_cancel_leave_request(leave_id):
 
     if not leave:
         conn.close()
-        return "ไม่พบคำขอลานี้ หรือคุณไม่มีสิทธิ์ยกเลิกคำขอนี้"
+        flash("ไม่พบคำขอลานี้ หรือคุณไม่มีสิทธิ์ยกเลิกคำขอนี้", "danger")
+        return redirect('/my_leave_requests')
 
-    if leave['status'] != 'pending':
+    if not leave['status'].startswith('pending'):
         conn.close()
-        return "ไม่สามารถยกเลิกคำขอลาที่อนุมัติแล้วได้"
+        flash("ไม่สามารถยกเลิกคำขอลาที่อนุมัติแล้วได้", "danger")
+        return redirect('/my_leave_requests')
 
+    # อัปเดตสถานะเป็น "cancel"
+    conn.execute("""
+        UPDATE leave_requests
+        SET status = 'cancel'
+        WHERE leave_id = ?
+    """, (leave_id,))
+    conn.commit()
     conn.close()
-    return render_template('leave/confirm_cancel.html', leave=leave)
+
+    flash("ยกเลิกคำขอลาเรียบร้อย", "success")
+    return redirect('/my_leave_requests')
 
 # Leave Approval List: แสดงรายการคำขอลาที่รออนุมัติ
 @app.route('/leave_approval_list')
@@ -5138,14 +5258,14 @@ def leave_approval_list():
     current_subcat = session.get('sub_category_id')
     conn = get_db_connection()
     
-    if current_role == 'HR':
-        # HR: แสดงใบลาทั้งหมดในสถานะ pending และ pending_final
+    if current_subcat == 2:
+        # HR: แสดงใบลาในสถานะ pending_hr
         query = """
             SELECT lr.leave_id, lr.user_id, lr.leave_type, lr.start_date, lr.end_date, lr.status, lr.days_requested,
-                   u.first_name || ' ' || u.last_name AS full_name
+                   u.nickname || ' - ' || u.first_name AS full_name
             FROM leave_requests lr
             JOIN users u ON lr.user_id = u.user_id
-            WHERE lr.status IN ('pending', 'pending_final', 'approved', 'rejected')
+            WHERE lr.status == 'pending_hr'
             ORDER BY lr.leave_id DESC
         """
         params = []
@@ -5154,7 +5274,7 @@ def leave_approval_list():
             # Manager (General): แสดงเฉพาะใบลาที่อยู่ในสถานะ pending_final
             query = """
                 SELECT lr.leave_id, lr.user_id, lr.leave_type, lr.start_date, lr.end_date, lr.status, lr.days_requested,
-                       u.first_name || ' ' || u.last_name AS full_name
+                       u.nickname || ' - ' || u.first_name AS full_name
                 FROM leave_requests lr
                 JOIN users u ON lr.user_id = u.user_id
                 WHERE lr.status = 'pending_final'
@@ -5196,6 +5316,7 @@ def leave_approve():
       - Manager(general) subcat=3 => final approve
     """
     leave_id = request.form['leave_id']
+    leave_start = request.form['start_date']
     action = request.form['action']  # 'approve', 'reject', 'conditional'
     new_leave_type = request.form.get('new_leave_type', None)
     hr_comment = request.form.get('hr_comment', '')
@@ -5229,7 +5350,6 @@ def leave_approve():
         # หากมี new_leave_type => เปลี่ยนประเภทลา
         final_leave_type = new_leave_type if new_leave_type else old_leave_type
         
-        # ---------- Remove original block that forbid HR ----------
         # ถ้า current_role=='HR': => อนุญาตให้ทำงานเหมือน manager(child)
 
         # แยกเป็น 2 ส่วน: (1) HR หรือ Manager(child) subcat != 3, (2) Manager(general) subcat=3
@@ -5237,8 +5357,8 @@ def leave_approve():
             # ----- ส่วน HR กับ Manager(child) -----
             # (1) ถ้า action='approve' หรือ 'conditional' => เปลี่ยนสถานะเป็น 'pending_final'
             if action in ['approve','conditional']:
-                # เช็ค leftover on-the-fly (ถ้าใบลาสถานะยังเป็น pending, กำลังจะ up เป็น pending_final)
-                if old_status == 'pending':
+                # เช็ค leftover on-the-fly (ถ้าใบลาสถานะยังเป็น pending, กำลังจะ up เป็น 'pending_final')
+                if old_status in ('pending', 'pending_hr'):
                     # leftover check
                     if final_leave_type in ['ลาพักร้อน','ลากิจ','ลาป่วย','ลางานศพ (ไม่หักเงิน)','ลาเทศกาล']:
                         leftover = get_on_the_fly_leftover_exclude(employee_id, final_leave_type, req_year, exclude_leave_id=leave_id)
@@ -5300,7 +5420,7 @@ def leave_approve():
         elif (current_role.startswith("MANAGER") or current_role=='HR') and str(current_subcat) == "3":
             # ----- ส่วน Manager(general) subcat=3 => final approve -----
             if old_status != 'pending_final':
-                flash("ใบลานี้ยังไม่ถึงขั้นตอน final (pending_final)", "warning")
+                flash("ใบลานี้ยังไม่ถึงขั้นตอนให้ ผจก. อนุมัติ", "warning")
                 conn.close()
                 return redirect(url_for('leave_approval_list'))
             
@@ -5346,11 +5466,11 @@ def leave_approve():
 
         # แจ้งเตือน employee ทราบ
         if new_status == 'approved':
-            message = f"คำขอลา ID {leave_id} ของคุณได้รับการอนุมัติ"
+            message = f"ใบลาวันที่ {leave_start} ได้รับการอนุมัติ"
         elif new_status == 'rejected':
-            message = f"คำขอลา ID {leave_id} ของคุณถูกปฏิเสธ: {hr_comment}"
+            message = f"ใบลาวันที่ {leave_start} ถูกปฏิเสธ: {hr_comment}"
         else:
-            message = f"คำขอลา ID {leave_id} ของคุณปรับเป็น {new_status}"
+            message = f"ใบลาวันที่ {leave_start} ถูกปรับเป็น: {final_leave_type}"
 
         add_notification_with_connection(conn, employee_id, message)
 
@@ -5422,10 +5542,10 @@ def leave_quota():
     else:
         # GET
         users = conn.execute("""
-            SELECT user_id, first_name, last_name
+            SELECT user_id, first_name, last_name, nickname, start_date
             FROM users
             WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
-            ORDER BY user_id
+            ORDER BY start_date
         """).fetchall()
 
         # load carry_forward from DB
@@ -5500,17 +5620,17 @@ def hr_leave_quota_list():
     # 2) ดึง user (non-Admin)
     user_rows = conn.execute("""
         SELECT user_id, first_name, last_name, start_date, 
-               probation, festival_option
+               probation, festival_option, nickname
         FROM users
         WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
-        ORDER BY user_id
+        ORDER BY start_date
     """).fetchall()
 
     # user_info[user_id] = {...}
     user_info = {}
     for r in user_rows:
         user_info[r['user_id']] = {
-            'name': f"{r['first_name']} {r['last_name']}",
+            'name': f"{r['nickname']} -- {r['first_name']} {r['last_name']}",
             'start_date': r['start_date'] or '',
             'probation': r['probation'] or 1,
             'festival_option': r['festival_option'] or 1
@@ -6310,10 +6430,10 @@ def insurance_fund_add():
     conn = get_db_connection()
     # 1) ดึงพนักงาน (ไม่รวม Admin)
     users = conn.execute("""
-        SELECT user_id, nickname, first_name
+        SELECT user_id, nickname, first_name, nickname, start_date
         FROM users
         WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
-        ORDER BY user_id
+        ORDER BY start_date
     """).fetchall()
 
     # 2) คำนวณ "ยอดคงเหลือปัจจุบัน" (balance) ของแต่ละ user
@@ -6828,7 +6948,7 @@ def insurance_stop_approve():
     conn.close()
     flash(f"{req_type} => {new_status} เรียบร้อย","success")
     return redirect(url_for('insurance_stop_list'))
-
+                                                                             
 # ขอเบิกเงินสะสม
 @app.route('/insurance_withdraw_request', methods=['GET','POST'])
 @role_required('EMPLOYEE','HR','MANAGER', 'SECRETARY')
@@ -7368,10 +7488,10 @@ def insurance_repay_stop_approve():
 def insurance_fund_form():
     conn = get_db_connection()
     rows = conn.execute("""
-        SELECT user_id, first_name, last_name
+        SELECT user_id, first_name, last_name, nickname, start_date
         FROM users
         WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
-        ORDER BY user_id
+        ORDER BY start_date
     """).fetchall()
     conn.close()
 
@@ -7598,10 +7718,11 @@ def export_attendance():
 
 
 ### -------------------------------------------
-### Salary Seup ปรับฐานเงินเดือน
+### Salary Setup ปรับฐานเงินเดือน
 ### -------------------------------------------
+# HR Salary setup ทีละคน
 @app.route('/hr/salary_setup', methods=['GET', 'POST'])
-@role_required('HR', 'ADMIN')
+@role_required('HR')
 def salary_setup():
     conn = get_db_connection()
 
@@ -7634,10 +7755,10 @@ def salary_setup():
 
     else:
         users = conn.execute("""
-            SELECT user_id, first_name, last_name
+            SELECT user_id, first_name, last_name, nickname, start_date
             FROM users
             WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
-            ORDER BY user_id
+            ORDER BY start_date
         """).fetchall()
         print("Users:", [dict(user) for user in users])  # Debug Users
 
@@ -7659,17 +7780,70 @@ def salary_setup():
                     "hourly_wage": row["hourly_wage"],
                     "effective_date": row["effective_date"]
                 }
-            print("Selected User ID:", selected_user_id, "Salary Info:", current_salary_info)  # Debug Salary Info
 
         conn.close()
 
-        # Debug สุดท้ายก่อน Render Template
-        print("Rendering Template with Data:")
-        print("Users:", users)
-        print("Selected User ID:", selected_user_id)
-        print("Current Salary Info:", current_salary_info)
-
         return render_template("hr/salary_setup.html", users=users, selected_user_id=selected_user_id, current_salary_info=current_salary_info)
+
+# ADMIN Salary setup ทุกคน
+@app.route('/admin/salary_setup', methods=['GET', 'POST'])
+@role_required('ADMIN')
+def admin_salary_setup():
+    conn = get_db_connection()
+    if request.method == 'POST':
+        # รับค่าจาก form สำหรับวันที่มีผลและเหตุผล
+        effective_date = request.form.get('effective_date')
+        reason = request.form.get('reason', 'ปรับฐานเงินเดือน')
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # รับค่า user_id และ new_base_salary จากแต่ละแถวในตาราง
+        user_ids = request.form.getlist('user_id')
+        new_base_salaries = request.form.getlist('new_base_salary')
+        
+        # วนลูปเพื่ออัปเดตฐานเงินเดือนใหม่สำหรับพนักงานที่มีค่า new_base_salary ไม่ว่าง
+        for uid, new_salary in zip(user_ids, new_base_salaries):
+            if new_salary.strip() != "":
+                new_salary = float(new_salary)
+                daily_wage = new_salary / 30
+                hourly_wage = daily_wage / 8
+                
+                conn.execute("""
+                    INSERT INTO salary_records (user_id, base_salary, daily_wage, hourly_wage, effective_date, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (uid, new_salary, daily_wage, hourly_wage, effective_date, now_str))
+                
+                conn.execute("""
+                    INSERT INTO salary_history (user_id, new_salary, reason, effective_date, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (uid, new_salary, reason, effective_date, now_str))
+        
+        conn.commit()
+        conn.close()
+        flash("บันทึกฐานเงินเดือนใหม่เรียบร้อย", "success")
+        return redirect(url_for('admin_salary_setup'))
+    else:
+        # GET: ดึงรายชื่อพนักงานที่มี role ที่ต้องการ
+        employees = conn.execute("""
+            SELECT user_id, first_name, last_name, nickname
+            FROM users
+            WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
+            ORDER BY user_id
+        """).fetchall()
+        
+        # ดึงฐานเงินเดือนปัจจุบันล่าสุดของแต่ละพนักงาน
+        salary_info = {}
+        for emp in employees:
+            row = conn.execute("""
+                SELECT base_salary
+                FROM salary_records
+                WHERE user_id=?
+                ORDER BY salary_id DESC
+                LIMIT 1
+            """, (emp['user_id'],)).fetchone()
+            salary_info[emp['user_id']] = row['base_salary'] if row else None
+        conn.close()
+        
+        return render_template("admin/salary_setup.html", employees=employees, salary_info=salary_info)
 
 
 
@@ -8011,11 +8185,12 @@ def manage_payday_config():
     year = int(request.args.get('year', default_year))
     month = int(request.args.get('month', default_month))
 
-    # ดึง user สำหรับ dropdown หรือ table (แล้วแต่ดีไซน์)
+    # ดึงข้อมูลพนักงานจากฐานข้อมูลเฉพาะ role HR, EMPLOYEE, MANAGER เท่านั้น
     user_rows = conn.execute("""
-        SELECT user_id, first_name, last_name, nickname
+        SELECT user_id, first_name, last_name, nickname, start_date
         FROM users
-        ORDER BY user_id
+        WHERE role in ('HR', 'EMPLOYEE', 'MANAGER')
+        ORDER BY start_date
     """).fetchall()
 
     if request.method == 'POST':
@@ -8049,7 +8224,7 @@ def manage_payday_config():
             """, (uid, posted_year, posted_month, s_day, w_day, now_str))
             conn.commit()
 
-            flash(f"อัปเดตวันจ่าย (User={uid}, {posted_month}/{posted_year}) => Salary={s_day},Welfare={w_day}", "success")
+            flash(f"อัปเดตวันจ่าย (User={uid}, {posted_month}/{posted_year}) => Salary={s_day}, Welfare={w_day}", "success")
             conn.close()
             return redirect(url_for('manage_payday_config', year=posted_year, month=posted_month))
 
@@ -8076,7 +8251,7 @@ def manage_payday_config():
             """, (posted_year, posted_month, s_day, w_day, now_str))
             conn.commit()
 
-            flash(f"Apply to ALL (user_id=0) for {posted_month}/{posted_year} => Salary={s_day},Welfare={w_day}", "success")
+            flash(f"Apply to ALL (user_id=0) for {posted_month}/{posted_year} => Salary={s_day}, Welfare={w_day}", "success")
             conn.close()
             return redirect(url_for('manage_payday_config', year=posted_year, month=posted_month))
         else:
@@ -8798,7 +8973,7 @@ def customer_database_indo():
 
 # 4. View Customer List
 @app.route('/customer_list')
-@role_required('OPD', 'ADMIN')
+@role_required('OPD', 'ADMIN', 'DOCTOR')
 def customer_list():
     page = request.args.get('page', 1, type=int)
     per_page = 100
@@ -9719,12 +9894,12 @@ def commission_users():
 
     # ดึงรายชื่อ user (role=EMPLOYEE,MANAGER) ที่มี pr_code != ''
     user_list = conn.execute("""
-        SELECT user_id, pr_code, first_name, last_name, role
+        SELECT user_id, pr_code, first_name, last_name, role, start_date, nickname
         FROM users
         WHERE role IN ('EMPLOYEE','MANAGER')
           AND pr_code IS NOT NULL
           AND pr_code != ''
-        ORDER BY user_id
+        ORDER BY start_date
     """).fetchall()
 
     if request.method == 'POST':
@@ -9881,12 +10056,12 @@ def monthly_sales():
     # 2) ดึง user list: EMPLOYEE, MANAGER ที่มี pr_code
     conn = get_db_connection()
     user_rows = conn.execute("""
-        SELECT user_id, pr_code, first_name, last_name, role
+        SELECT user_id, pr_code, first_name, last_name, role, nickname, start_date
         FROM users
         WHERE role IN ('EMPLOYEE','MANAGER')
           AND pr_code IS NOT NULL
           AND pr_code != ''
-        ORDER BY user_id
+        ORDER BY start_date
     """).fetchall()
 
     # สร้าง dict user_map ดีกว่า: key=pr_code => {info}
@@ -9995,12 +10170,12 @@ def monthly_sales_details():
     # 2) ดึง user list: EMPLOYEE,MANAGER + pr_code != ''
     conn = get_db_connection()
     user_rows = conn.execute("""
-        SELECT user_id, pr_code, first_name, last_name, role
+        SELECT user_id, pr_code, first_name, last_name, role, nickname, start_date
         FROM users
         WHERE role IN ('EMPLOYEE','MANAGER')
           AND pr_code IS NOT NULL
           AND pr_code != ''
-        ORDER BY user_id
+        ORDER BY start_date
     """).fetchall()
 
     # user_map: key=pr_code -> { user_id, pr_code, name, role }
@@ -10009,6 +10184,7 @@ def monthly_sales_details():
         user_map[ur['pr_code']] = {
             "user_id": ur['user_id'],
             "pr_code": ur['pr_code'],
+            "nickname": ur['nickname'],
             "name": f"{ur['first_name']} {ur['last_name']}",
             "role": ur['role']
         }
@@ -10064,6 +10240,7 @@ def monthly_sales_details():
         # pcode => user_map => user_id, name, role
         list_rows.append({
             "user_pr_code": pcode,
+            "user_nickname": user_map[pcode]["nickname"],
             "user_name": user_map[pcode]["name"],
             "user_role": user_map[pcode]["role"],
             "category": cat,
@@ -10153,6 +10330,7 @@ def incentive_users():
               pr_code,
               nickname,
               first_name,
+              start_date,
               incentive_sx_rate,
               incentive_aes_rate,
               incentive_afc_rate,
@@ -10168,7 +10346,7 @@ def incentive_users():
               manager
             FROM users
             WHERE role IN ('EMPLOYEE','MANAGER', 'SECRETARY')
-            ORDER BY user_id
+            ORDER BY start_date
         """).fetchall()
         conn.close()
 
@@ -10287,10 +10465,10 @@ def aes_commission_assignment():
 
         # ดึงรายชื่อ user
         user_rows = conn.execute("""
-            SELECT user_id, nickname, first_name, last_name
+            SELECT user_id, nickname, first_name, last_name, start_date
             FROM users
             WHERE sub_category_id=10 AND role='EMPLOYEE'
-            ORDER BY user_id
+            ORDER BY start_date
         """).fetchall()
         conn.close()
 
@@ -10467,10 +10645,10 @@ def translate_commission():
         user_list = []
         if user_role in ('HR','ADMIN'):
             user_list = conn.execute("""
-                SELECT user_id, nickname, first_name, role
+                SELECT user_id, nickname, first_name, role, start_date
                 FROM users
                 WHERE sub_category_id = 9
-                ORDER BY user_id
+                ORDER BY start_date
             """).fetchall()
 
         conn.close()
@@ -10527,10 +10705,10 @@ def credit_commission():
     # 2) ดึงรายชื่อ user ที่ sub_category_id=12
     #    สมมติ role=HR/ADMIN => เห็นทุกคน
     user_rows = conn.execute("""
-        SELECT user_id, first_name, last_name, nickname
+        SELECT user_id, first_name, last_name, nickname, start_date
         FROM users
         WHERE sub_category_id=12
-        ORDER BY user_id
+        ORDER BY start_date
     """).fetchall()
 
     if request.method == 'POST':

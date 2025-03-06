@@ -55,6 +55,10 @@
 <div class="container">
   <h3 class="mb-3 text-center">สรุปสิทธิ์วันลาของพนักงาน (HR)</h3>
 
+  <hr>
+  <a href="/hr" class="btn btn-secondary mt-3">กลับสู่หน้าหลัก</a>
+  <hr>
+
   <!-- วนปีตามข้อมูล -->
   {% for year, user_dict_data in data.items() %}
   <div class="year-section">
@@ -64,7 +68,7 @@
     <div class="card">
       <div class="card-header">
         <!-- แก้ไขส่วนนี้ให้แสดงชื่อเต็มจาก user_dict -->
-        <h5>{{ user_dict[uid] }} (UserID: {{ uid }})</h5>
+        <h5>{{ user_dict[uid] }}</h5>
       </div>
       <div class="card-body">
         <!-- 1) สิทธิ์วันลาคงเหลือ (LEAVE_TYPES_QUOTA) -->

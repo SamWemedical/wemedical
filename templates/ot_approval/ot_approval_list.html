@@ -35,9 +35,8 @@
             <thead class="table-light">
               <tr>
                 <!-- ไม่โชว์ attendance_id และ user_id -->
-                <th>ชื่อ - นามสกุล</th>
-                <th>เวลาเข้างาน</th>
-                <th>เวลาเลิกงาน</th>
+                <th>ชื่อ</th>
+                <th>วัน-เวลาเลิกงาน</th>
                 <th>เหตุผล</th>
                 <th>อนุมัติเพราะ</th>
                 <th>สถานะ</th>
@@ -48,8 +47,7 @@
             {% for r in ot_rows %}
               <tr>
                 <!-- แสดงชื่อจริง นามสกุล -->
-                <td>{{ r.first_name }} {{ r.last_name }}</td>
-                <td>{{ r.checkin_time }}</td>
+                <td>{{ r.nickname }} -- {{ r.first_name }}</td>
                 <td>{{ r.checkout_time }}</td>
                 <td>{{ r.ot_reason or '' }}</td>
                 <td>{{ r.ot_approve_comment or '' }}</td>

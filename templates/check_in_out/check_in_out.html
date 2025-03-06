@@ -81,6 +81,9 @@
         <!-- Form สำหรับ Check In -->
         <form method="POST" id="formCheckIn" style="flex: 1;">
           <input type="hidden" name="action" value="checkin">
+          <!-- Hidden fields สำหรับเก็บค่าพิกัด -->
+          <input type="hidden" id="latitude_in" name="latitude">
+          <input type="hidden" id="longitude_in" name="longitude">
           <button type="submit" class="btn btn-success btn-lg"
             {% if status == 'ready_to_checkout' %}disabled{% endif %}>
             บันทึกเวลาเข้างาน
@@ -88,8 +91,10 @@
         </form>
         <!-- Form สำหรับ Check Out -->
         <form method="POST" id="formCheckOut" style="flex: 1;">
-          <!-- ไม่แสดงช่องกรอก ot_reason ที่นี่แล้ว -->
           <input type="hidden" name="action" value="checkout">
+          <!-- Hidden fields สำหรับเก็บค่าพิกัด -->
+          <input type="hidden" id="latitude_out" name="latitude">
+          <input type="hidden" id="longitude_out" name="longitude">
           <button type="submit" class="btn btn-danger btn-lg"
             {% if status == 'ready_to_checkin' %}disabled{% endif %}>
             บันทึกเวลาเลิกงาน
@@ -136,8 +141,38 @@
 
 <!-- Bootstrap Bundle JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
-  // ดึง element จาก DOM
+  // ฟังก์ชันเพื่อดึงตำแหน่งปัจจุบันของผู้ใช้และเซ็ตค่าให้กับฟอร์ม Check In และ Check Out
+  function updateLocationFields() {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          var latitude = position.coords.latitude;
+          var longitude = position.coords.longitude;
+          // เซ็ตค่าให้กับฟิลด์ใน form Check In
+          document.getElementById("latitude_in").value = latitude;
+          document.getElementById("longitude_in").value = longitude;
+          // เซ็ตค่าให้กับฟิลด์ใน form Check Out
+          document.getElementById("latitude_out").value = latitude;
+          document.getElementById("longitude_out").value = longitude;
+        },
+        function(error) {
+          console.error("Error obtaining location: ", error);
+          alert("ไม่สามารถเข้าถึงตำแหน่งของคุณได้ กรุณาอนุญาตการเข้าถึงตำแหน่งในเบราว์เซอร์");
+        }
+      );
+    } else {
+      alert("เบราว์เซอร์ของคุณไม่รองรับ Geolocation API");
+    }
+  }
+
+  // เรียกใช้งานฟังก์ชัน updateLocationFields เมื่อหน้าเว็บโหลดขึ้นมา
+  window.addEventListener("load", function() {
+    updateLocationFields();
+  });
+
+  // ดึง element จาก DOM สำหรับ modal OT (ไม่เกี่ยวข้องกับ location)
   const formCheckOut = document.getElementById("formCheckOut");
   const otConfirmModalEl = document.getElementById("otConfirmModal");
   const otConfirmModal = new bootstrap.Modal(otConfirmModalEl);
@@ -145,7 +180,7 @@
   const btnOtNormal = document.getElementById("btnOtNormal");
   const modalOtReason = document.getElementById("modal_ot_reason");
 
-  // เมื่อ form Check Out ถูก submit ให้หยุดการส่งและแสดง modal
+  // เมื่อ form Check Out ถูก submit ให้หยุดการส่งและแสดง modal OT
   if (formCheckOut) {
     formCheckOut.addEventListener("submit", function(event) {
       event.preventDefault();

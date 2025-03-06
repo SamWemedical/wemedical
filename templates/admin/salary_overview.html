@@ -48,8 +48,8 @@
         <table class="table table-bordered table-hover">
           <thead class="table-dark">
             <tr>
-              <th>รหัสพนักงาน (user_id)</th>
               <th>ชื่อ-สกุล</th>
+              <th>ชื่อเล่น</th>  
               <th>ฐานเงินเดือน (บาท/เดือน)</th>
               <th>ค่าแรงรายวัน (บาท/วัน)</th>
               <th>ค่าแรงรายชั่วโมง (บาท/ชม.)</th>
@@ -59,8 +59,8 @@
           <tbody>
             {% for row in rows %}
             <tr>
-              <td>{{ row.user_id }}</td>
               <td>{{ row.first_name }} {{ row.last_name }}</td>
+              <td>{{ row.nickname }}</td>
               <td>{{ "{:,.2f}".format(row.base_salary) }}</td>
               <td>{{ "{:,.2f}".format(row.daily_wage) }}</td>
               <td>{{ "{:,.2f}".format(row.hourly_wage) }}</td>

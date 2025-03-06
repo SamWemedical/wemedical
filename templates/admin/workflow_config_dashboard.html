@@ -99,7 +99,7 @@
               <td>{{ config.function_key }}</td>
               <!-- Column 3: Require Subcategory & Description (Update Form) -->
               <td>
-                <form method="POST" action="{{ url_for('workflow_config_dashboard') }}">
+                <form method="POST" action="{{ url_for('admin_bp.workflow_config_dashboard') }}">
                   <input type="hidden" name="config_id" value="{{ config.config_id }}">
                   <div class="mb-2">
                     <select name="require_subcategory" class="form-select">
@@ -125,7 +125,7 @@
                         <div class="allowed-item">
                           {{ sub.sub_category_name }}
                           <!-- Form for Delete button -->
-                          <form method="POST" action="{{ url_for('delete_allowed_subcategory') }}" style="display:inline;">
+                          <form method="POST" action="{{ url_for('admin_bp.delete_allowed_subcategory') }}" style="display:inline;">
                             <input type="hidden" name="config_id" value="{{ config.config_id }}">
                             <input type="hidden" name="sub_category_id" value="{{ a }}">
                             <button type="submit" class="btn btn-sm btn-danger delete-btn">Delete</button>
@@ -151,7 +151,7 @@
                     <div class="candidate-item">
                       {{ candidate.sub_category_name }}
                       <!-- Form for Add button -->
-                      <form method="POST" action="{{ url_for('workflow_config_dashboard') }}" style="display:inline;">
+                      <form method="POST" action="{{ url_for('admin_bp.workflow_config_dashboard') }}" style="display:inline;">
                         <input type="hidden" name="config_id" value="{{ config.config_id }}">
                         <input type="hidden" name="require_subcategory" value="{{ config.require_subcategory }}">
                         <input type="hidden" name="description" value="{{ config.description or '' }}">

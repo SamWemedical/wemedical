@@ -88,7 +88,7 @@
             {% for ud in user_data %}
               <tr>
                 <td>{{ loop.index }}</td>
-                <td>{{ ud.nickname }} ... {{ ud.first_name }}</td>
+                <td>{{ ud.nickname }} -- {{ ud.first_name }}</td>
                 <td>{{ "{:,.2f}".format(ud.balance) }}</td>
 
                 <td>

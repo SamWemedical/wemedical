@@ -11,11 +11,11 @@
       font-family: "Sarabun", sans-serif;
     }
     .container {
-      max-width: 800px;
+      max-width: 600px;
       margin: 40px auto;
     }
     .card {
-      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
       margin-bottom: 20px;
     }
     .card-header {
@@ -26,10 +26,6 @@
     }
     .card-header h4 {
       margin: 0;
-    }
-    .month-divider {
-      border-top: 2px solid #ddd;
-      margin: 20px 0;
     }
     .status-approved {
       color: green;
@@ -43,15 +39,22 @@
       color: orange;
       font-weight: bold;
     }
-    .table thead th {
-      vertical-align: middle;
+    .table thead th, .table tbody td {
       text-align: center;
-    }
-    .table tbody td {
       vertical-align: middle;
-      text-align: center;
     }
-    /* ปุ่มนำทางด้านล่าง */
+    .btn-leave {
+      background-color: #6610f2;
+      color: black;
+      width: 92%;
+    }
+    .btn-leave:hover {
+      background-color: #915be8;
+      text-decoration: underline;
+    }
+    .btn-secondary {
+      width: 45%;
+    }
     .btn-group-bottom {
       display: flex;
       flex-wrap: wrap;
@@ -62,67 +65,63 @@
   </style>
 </head>
 <body>
-
 <div class="container">
   <div class="card shadow">
     <div class="card-header">
-      <h4>คำขอลาของฉัน</h4>
+      <h4>คำขอลาของฉัน (ปี {{ current_year }})</h4>
     </div>
     <div class="card-body">
-      {% if grouped_requests %}
-        {% for month_key, requests in grouped_requests.items() %}
-          {# month_key คาดว่าจะอยู่ในรูปแบบ "YYYY-MM" เช่น "2021-08" #}
-          {% set parts = month_key.split('-') %}
-          {% set display_year = parts[0] %}
-          {% set month_number = parts[1]|int %}
-          {% set month_name = months[month_number-1].name %}
-          <!-- Divider และหัวเรื่องของเดือน -->
-          <div class="month-divider"></div>
-          <h5 class="mb-3 text-center"><strong>เดือน {{ month_name }} {{ display_year }}</strong></h5>
-          <div class="table-responsive">
-            <table class="table table-bordered table-hover align-middle">
-              <thead class="table-light">
-                <tr>
-                  <th>วันที่เริ่ม</th>
-                  <th>วันที่สิ้นสุด</th>
-                  <th>ประเภทการลา</th>
-                  <th>จำนวนวัน</th>
-                  <th>สถานะ</th>
-                  <th>เหตุผล</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for leave in requests %}
-                <tr>
-                  <td>{{ leave.start_date }}</td>
-                  <td>{{ leave.end_date }}</td>
-                  <td>{{ leave.leave_type }}</td>
-                  <td>{{ leave.days_requested }}</td>
-                  <td class="{% if leave.status == 'approved' %}status-approved{% elif leave.status == 'rejected' %}status-rejected{% else %}status-pending{% endif %}">
-                    {{ leave.status }}
-                  </td>
-                  <td>{{ leave.reason }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        {% endfor %}
+      {% if leave_requests %}
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>วันลา</th>
+                <th>ประเภท</th>
+                <th>จำนวนวัน</th>
+                <th>สถานะ</th>
+                <th>เหตุผล</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for leave in leave_requests %}
+              <tr>
+                <td>
+                  <!-- แสดงวันที่ในรูปแบบ YYYY-MM-DD -->
+                  {{ leave.start_date }} - {{ leave.end_date }}
+                </td>
+                <td>{{ leave.leave_type }}</td>
+                <td>{{ leave.days_requested }}</td>
+                <td class="{% if leave.status == 'approved' %}status-approved{% elif leave.status == 'rejected' %}status-rejected{% else %}status-pending{% endif %}">
+                  {{ leave.status }}
+                </td>
+                <td>{{ leave.reason }}</td>
+                <td>
+                  <form method="POST" action="{{ url_for('edit_leave_request', leave_id=leave.leave_id) }}" class="d-inline">
+                    <button type="submit" class="btn btn-sm btn-outline-primary">แก้ไข</button>
+                  </form>
+                  <hr>
+                  <form method="POST" action="{{ url_for('cancel_leave_request', leave_id=leave.leave_id) }}" onsubmit="return confirm('ยืนยันการยกเลิกใบลานี้?');" class="d-inline">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">ยกเลิก</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       {% else %}
-        <p class="text-center text-muted">ไม่มีข้อมูลคำขอลา</p>
+        <p class="text-center text-muted">ไม่มีข้อมูลคำขอลาในปี {{ current_year }}</p>
       {% endif %}
     </div>
   </div>
-  
-  <!-- ปุ่มนำทางด้านล่าง -->
   <div class="btn-group-bottom">
-    <a href="/my_leave_quota" class="btn btn-secondary">ดูสิทธิ์วันลาคงเหลือ</a>
+    <a href="/my_leave_quota" class="btn btn-leave text-white">ดูสิทธิ์วันลาคงเหลือ</a>
     <a href="javascript:history.back()" class="btn btn-secondary">ย้อนกลับ</a>
     <a href="/dashboard" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
   </div>
-  
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
