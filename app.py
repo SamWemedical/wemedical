@@ -4604,7 +4604,7 @@ def schedule_editor_step1():
 
 # Step 2
 @app.route('/hr/schedule_editor_step2')
-@role_required('HR')
+@role_required('HR', 'MANAGER', 'ADMIN')
 def schedule_editor_step2():
     year = int(request.args.get('year', '2025'))
     month = int(request.args.get('month', '1'))
@@ -4686,7 +4686,7 @@ def schedule_editor_step2():
 
 # Step 3: save แล้วจะไม่ลบ Work Schedule เดิม แต่จะอัปเดตเฉพาะวันที่ HR ระบุ
 @app.route('/hr/schedule_editor_save', methods=['POST'])
-@role_required('HR')
+@role_required('HR', 'MANAGER', 'ADMIN')
 def schedule_editor_save():
     year_str = request.form.get('year')
     month_str = request.form.get('month')
@@ -4732,7 +4732,7 @@ def schedule_editor_save():
 
 # Step 4: คำนวณ Attendance ใหม่
 @app.route('/recalculate_attendance/<int:user_id>/<work_date>', methods=['POST'])
-@role_required('HR')
+@role_required('HR', 'MANAGER', 'ADMIN')
 def recalculate_attendance_route(user_id, work_date):
     recalculate_attendance(user_id, work_date)
     return redirect(url_for('attendance_summary', year=work_date[:4], month=work_date[5:7]))
