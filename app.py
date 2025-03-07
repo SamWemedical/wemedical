@@ -17,7 +17,7 @@ import calendar
 from db import get_db_connection
 from auth_decorators import role_required
 
-locale.setlocale(locale.LC_TIME, "th_TH.UTF-8")
+locale.setlocale(locale.LC_TIME, "Thai_Thailand.874")
 
 app = Flask(__name__)
 app.secret_key = "secret_key"
@@ -4520,7 +4520,7 @@ def ot_approve():
 def schedule_editor_step1():
     """
     หน้าฟอร์มให้ HR/Manager เลือกพนักงานหลายคน + ใส่ปี/เดือน
-    แล้ว POST -> ot_summary_step2
+    แล้ว POST -> schedule_editor_step2
     """
     if request.method == 'POST':
         # รับ user_ids (list)
@@ -4529,7 +4529,7 @@ def schedule_editor_step1():
         month = request.form.get('month')
         # รวมเป็นสตริง
         user_str = ",".join(user_ids)
-        return redirect(url_for('ot_summary_step2', user_str=user_str, year=year, month=month))
+        return redirect(url_for('schedule_editor_step2', user_str=user_str, year=year, month=month))
     else:
         conn = get_db_connection()
 
