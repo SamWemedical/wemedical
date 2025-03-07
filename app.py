@@ -17,7 +17,7 @@ import calendar
 from db import get_db_connection
 from auth_decorators import role_required
 
-locale.setlocale(locale.LC_TIME, "Thai_Thailand.874")
+locale.setlocale(locale.LC_TIME, "th_TH.UTF-8")
 
 app = Flask(__name__)
 app.secret_key = "secret_key"
