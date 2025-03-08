@@ -17,7 +17,7 @@ import calendar
 from db import get_db_connection
 from auth_decorators import role_required
 
-locale.setlocale(locale.LC_TIME, "th_TH.UTF-8")
+locale.setlocale(locale.LC_TIME, "Thai_Thailand.874")
 
 app = Flask(__name__)
 app.secret_key = "secret_key"
@@ -4094,9 +4094,9 @@ def check_in_out():
         CLINIC_LNG = 100.54715289024793
 
         distance = calculate_distance(device_lat, device_lng, CLINIC_LAT, CLINIC_LNG)
-        if distance > 30:
+        if distance > 100:
             conn.close()
-            return f"ตำแหน่งของคุณอยู่ห่างจากคลินิก {distance:.1f} เมตร ซึ่งเกินขีดจำกัด 30 เมตร กรุณาอยู่ใกล้คลินิกเพื่อบันทึกเวลาเข้าออกงาน"
+            return f"ตำแหน่งของคุณอยู่ห่างจากคลินิก {distance:.1f} เมตร ซึ่งเกินขีดจำกัด 100 เมตร กรุณาอยู่ใกล้คลินิกเพื่อบันทึกเวลาเข้าออกงาน"
 
         action = request.form.get('action')
         row = conn.execute("""
