@@ -6,40 +6,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body {
-      background-color: #f9f9f9;
-    }
-    .container {
-      max-width: 1200px;
-      margin-top: 40px;
-    }
-    .main-table {
-      border: 1px solid #dee2e6;
-    }
-    .main-table thead {
-      background-color: #e9ecef;
-    }
-    .modal-table th {
-      width: 30%;
-      background-color: #f2f2f2;
-    }
-    .modal-table td {
-      background-color: #fff;
-    }
-    .btn-info {
-      color: #fff;
-    }
+    body { background:#f9f9f9; }
+    .container { max-width:1200px; margin-top:40px; }
+    .main-table { border:1px solid #dee2e6; }
+    .main-table thead { background:#e9ecef; }
+    .modal-table th { width:30%; background:#f2f2f2; }
+    .modal-table td { background:#fff; }
+    .btn-info { color:#fff; }
   </style>
 </head>
 <body>
 <div class="container-fluid">
   <h1>รายชื่อคนไข้</h1>
-  
   <a href="/dashboard" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
   <hr>
-  <!-- ตั้งค่า default ให้กับ total_pages หากไม่ถูกส่งมาจาก backend -->
   {% set total_pages = total_pages|default(1) %}
-
   <!-- Search Form -->
   <form method="GET" action="{{ url_for('search_customer') }}" class="mb-3">
     <div class="input-group">
@@ -47,8 +28,6 @@
       <button type="submit" class="btn btn-primary">ค้นหา</button>
     </div>
   </form>
-
-  <!-- ถ้ามีการค้นหา (search_query มีค่า) ให้แสดงตารางผลการค้นหาด้านบน -->
   {% if search_query %}
     <h3>ผลการค้นหา:</h3>
     {% if search_results %}
@@ -61,6 +40,7 @@
             <th>ประเทศ</th>
             <th>เบอร์โทรฯ</th>
             <th>อายุ</th>
+            <th>บริการ</th>
             <th>รายละเอียด</th>
           </tr>
         </thead>
@@ -73,6 +53,13 @@
             <td>{{ customer.nationality or '-' }}</td>
             <td>{{ customer.phone or '-' }}</td>
             <td>{{ customer.calculated_age or '-' }}</td>
+            <td>
+              {% if customer.service_type %}
+                {% for svc in customer.service_type | fromjson %}
+                  {{ svc.short_code }} ({{ svc.record_date }}){% if not loop.last %}, {% endif %}
+                {% endfor %}
+              {% else %} - {% endif %}
+            </td>
             <td>
               <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#customerModal{{ customer.id }}">
                 View
@@ -88,7 +75,6 @@
     {% endif %}
   {% endif %}
   
-  <!-- Main Table: รายชื่อคนไข้ทั้งหมด -->
   <h3>รายชื่อคนไข้ทั้งหมด:</h3>
   <table class="table table-hover table-bordered main-table">
     <thead class="table-primary">
@@ -99,6 +85,7 @@
         <th>ประเทศ</th>
         <th>เบอร์โทรฯ</th>
         <th>อายุ</th>
+        <th>บริการ</th>
         <th>รายละเอียด</th>
       </tr>
     </thead>
@@ -112,6 +99,13 @@
         <td>{{ customer.phone or '-' }}</td>
         <td>{{ customer.calculated_age or '-' }}</td>
         <td>
+          {% if customer.service_type %}
+            {% for svc in customer.service_type | fromjson %}
+              {{ svc.short_code }} ({{ svc.record_date }}){% if not loop.last %}, {% endif %}
+            {% endfor %}
+          {% else %} - {% endif %}
+        </td>
+        <td>
           <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#customerModal{{ customer.id }}">
             View
           </button>
@@ -121,59 +115,82 @@
     </tbody>
   </table>
   
-  <!-- Pagination Controls -->
   {% if total_pages > 1 %}
   <nav aria-label="Page navigation">
     <ul class="pagination">
       {% if page > 1 %}
-      <li class="page-item">
-        <a class="page-link" href="{{ url_for('customer_list', page=page-1) }}" aria-label="Previous">
-          <span aria-hidden="true">&laquo;</span>
-        </a>
-      </li>
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('customer_list', page=page-1) }}" aria-label="Previous">
+            <span aria-hidden="true">&laquo;</span>
+          </a>
+        </li>
       {% else %}
-      <li class="page-item disabled">
-        <span class="page-link">&laquo;</span>
-      </li>
+        <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
       {% endif %}
-      
-      {% for p in range(1, total_pages+1) %}
+
+      {# กำหนด window ของหน้า pagination ให้แสดง 5 หน้า #}
+      {% set max_links = 5 %}
+      {% set start_page = page - (max_links // 2) %}
+      {% set end_page = page + (max_links // 2) %}
+      {% if start_page < 1 %}
+        {% set end_page = end_page + (1 - start_page) %}
+        {% set start_page = 1 %}
+      {% endif %}
+      {% if end_page > total_pages %}
+        {% set start_page = start_page - (end_page - total_pages) %}
+        {% set end_page = total_pages %}
+        {% if start_page < 1 %}{% set start_page = 1 %}{% endif %}
+      {% endif %}
+
+      {# หากมีหน้าก่อน window ให้แสดงหน้าแรกและ ellipsis #}
+      {% if start_page > 1 %}
+        <li class="page-item"><a class="page-link" href="{{ url_for('customer_list', page=1) }}">1</a></li>
+        {% if start_page > 2 %}
+          <li class="page-item disabled"><span class="page-link">...</span></li>
+        {% endif %}
+      {% endif %}
+
+      {# วน loop แสดงหน้าจาก start_page ถึง end_page #}
+      {% for p in range(start_page, end_page+1) %}
         {% if p == page %}
           <li class="page-item active"><span class="page-link">{{ p }}</span></li>
         {% else %}
           <li class="page-item"><a class="page-link" href="{{ url_for('customer_list', page=p) }}">{{ p }}</a></li>
         {% endif %}
       {% endfor %}
-      
+
+      {# หากมีหน้าต่อจาก window ให้แสดง ellipsis และหน้าสุดท้าย #}
+      {% if end_page < total_pages %}
+        {% if end_page < total_pages - 1 %}
+          <li class="page-item disabled"><span class="page-link">...</span></li>
+        {% endif %}
+        <li class="page-item"><a class="page-link" href="{{ url_for('customer_list', page=total_pages) }}">{{ total_pages }}</a></li>
+      {% endif %}
+
       {% if page < total_pages %}
-      <li class="page-item">
-        <a class="page-link" href="{{ url_for('customer_list', page=page+1) }}" aria-label="Next">
-          <span aria-hidden="true">&raquo;</span>
-        </a>
-      </li>
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('customer_list', page=page+1) }}" aria-label="Next">
+            <span aria-hidden="true">&raquo;</span>
+          </a>
+        </li>
       {% else %}
-      <li class="page-item disabled">
-        <span class="page-link">&raquo;</span>
-      </li>
+        <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
       {% endif %}
     </ul>
   </nav>
   {% endif %}
-  
   <a href="/dashboard" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
 </div>
 
-<!-- Modal Section: For each customer in customers -->
+<!-- Modal Section: For each customer -->
 {% for customer in customers %}
 <div class="modal fade" id="customerModal{{ customer.id }}" tabindex="-1" aria-labelledby="modalLabel{{ customer.id }}" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
-      <!-- Modal Header -->
       <div class="modal-header">
         <h5 class="modal-title" id="modalLabel{{ customer.id }}">รายละเอียดคนไข้ (HN: {{ customer.hn }})</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <!-- Modal Body: แสดงรายละเอียดแบบตาราง -->
       <div class="modal-body">
         <table class="table table-bordered modal-table">
           <tbody>
@@ -190,7 +207,7 @@
               <td>{{ customer.phone or '-' }}</td>
             </tr>
             <tr>
-              <th>เลขบัตรประจำตัวประชาชน/เลขพาสปอร์ต</th>
+              <th>เลขบัตรประชาชน/พาสปอร์ต</th>
               <td>{{ customer.id_card_or_passport or '-' }}</td>
             </tr>
             <tr>
@@ -214,7 +231,7 @@
               <td>{{ customer.occupation or '-' }}</td>
             </tr>
             <tr>
-              <th>ชื่อบุคคลติดต่อกรณีฉุกเฉิน</th>
+              <th>ติดต่อฉุกเฉิน</th>
               <td>{{ customer.emergency_contact or '-' }}</td>
             </tr>
             <tr>
@@ -234,26 +251,34 @@
               <td>{{ customer.chronic_disease or '-' }}</td>
             </tr>
             <tr>
-              <th>ยาที่ใช้อยู่ในปัจจุบัน</th>
+              <th>ยาที่ใช้อยู่</th>
               <td>{{ customer.current_medications or '-' }}</td>
             </tr>
             <tr>
-              <th>ศัลยกรรมที่เคยทำมาก่อน</th>
+              <th>ศัลยกรรมที่ผ่านมา</th>
               <td>{{ customer.previous_surgeries or '-' }}</td>
             </tr>
             <tr>
-              <th>ช่องทางที่รู้จัก WE clinic</th>
+              <th>ช่องทางรู้จัก WE clinic</th>
               <td>{{ customer.referral_channel or '-' }}</td>
             </tr>
             <tr>
-              <th>เหตุผลที่เลือก WE clinic</th>
+              <th>เหตุผลเลือก WE clinic</th>
               <td>{{ customer.reason_to_choose_clinic or '-' }}</td>
             </tr>
-            <!-- เพิ่มข้อมูลเพิ่มเติมได้ตามต้องการ -->
+            <tr>
+              <th>บริการ</th>
+              <td>
+                {% if customer.service_type %}
+                  {% for svc in customer.service_type | fromjson %}
+                    {{ svc.short_code }} ({{ svc.record_date }}){% if not loop.last %}, {% endif %}
+                  {% endfor %}
+                {% else %} - {% endif %}
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
-      <!-- End Modal Body -->
     </div>
   </div>
 </div>

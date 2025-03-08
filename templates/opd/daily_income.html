@@ -7,40 +7,14 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
   
   <style>
-    body {
-      background-color: #f9f9f9;
-    }
-    .container {
-      max-width: 1200px; 
-      margin-top: 40px;
-    }
-    .main-table {
-      border: 1px solid #dee2e6;
-    }
-    .main-table thead {
-      background-color: #e9ecef;
-    }
-    thead.custom-header {
-      background-color: #ff00d4;
-      color: #ffffff;
-    }
-    .procedure-row {
-      margin-bottom: 10px;
-      padding: 10px;
-      border: 1px solid #dee2e6;
-      border-radius: 5px;
-      background-color: #fff;
-      position: relative;
-    }
-    .remove-procedure {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-    }
-    .prWarningBox {
-      display: none;
-      margin-bottom: 10px;
-    }
+    body { background-color: #f9f9f9; }
+    .container { max-width: 1200px; margin-top: 40px; }
+    .main-table { border: 1px solid #dee2e6; }
+    .main-table thead { background-color: #e9ecef; }
+    thead.custom-header { background-color: #ff00d4; color: #ffffff; }
+    .procedure-row { margin-bottom: 10px; padding: 10px; border: 1px solid #dee2e6; border-radius: 5px; background-color: #fff; position: relative; }
+    .remove-procedure { position: absolute; top: 10px; right: 10px; }
+    .prWarningBox { display: none; margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -108,14 +82,10 @@
 
             <!-- เงื่อนไข: เฉพาะวันปัจจุบัน ถึงจะแก้ไข/ลบได้ -->
             {% if record_date|default(current_date) == current_date %}
-              <!-- ปุ่ม "แก้ไข" =>
-                  ไปหน้า edit_daily_income(income_id=rec.id) -->
               <a href="{{ url_for('edit_daily_income', income_id=rec.id) }}"
                 class="btn btn-sm btn-warning">
                 แก้ไข
               </a>
-
-              <!-- ปุ่ม "ลบ" => POST to delete_daily_income(income_id=rec.id) -->
               <form method="POST"
                     action="{{ url_for('delete_daily_income', income_id=rec.id) }}"
                     style="display:inline;"
@@ -130,7 +100,6 @@
       {% endfor %}
     </tbody>
     
-    <!-- <tfoot> แสดงค่าที่ pass มาจาก Backend -->
     {% if daily_income_list|length > 0 %}
     <tfoot class="table-success">
       <tr>
@@ -162,7 +131,13 @@
         </div>
 
         <div class="modal-body">
-          <!-- SECTION 1: Customer Information -->
+          <!-- Field สำหรับเลือกวันที่บันทึก -->
+          <div class="mb-3">
+            <label for="record_date" class="form-label">เลือกวันที่บันทึก</label>
+            <input type="date" class="form-control" id="record_date" name="record_date" value="{{ record_date|default(current_date) }}">
+          </div>
+
+          <!-- SECTION: Customer Information -->
           <div class="card mb-3">
             <div class="card-header bg-primary text-white">ข้อมูลคนไข้</div>
             <div class="card-body">
@@ -175,7 +150,7 @@
             </div>
           </div>
 
-          <!-- SECTION 2: Procedure Details -->
+          <!-- SECTION: Procedure Details -->
           <div class="card mb-3">
             <div class="card-header bg-primary text-white">หัตถการ</div>
             <div class="card-body">
@@ -191,10 +166,10 @@
               </div>
             </div>
           </div>
-          <!-- Hidden field -->
+          <!-- Hidden field สำหรับส่งข้อมูล procedures -->
           <input type="hidden" id="procedures_data" name="procedures_data">
 
-          <!-- SECTION 3: Payment Details -->
+          <!-- SECTION: Payment Details -->
           <div class="card mb-3">
             <div class="card-header bg-success text-white">การชำระเงิน</div>
             <div class="card-body">
@@ -507,7 +482,6 @@
     fetch('/get_daily_income_detail?header_id=' + headerId)
       .then(response => response.json())
       .then(data => {
-        // แสดง Detail ในตาราง (เหมือนเดิม)
         const detailTableBody = document.querySelector("#detailTable tbody");
         detailTableBody.innerHTML = "";
         data.forEach(item => {
@@ -527,7 +501,6 @@
           detailTableBody.appendChild(tr);
         });
   
-        // อัปเดต title ของ Modal เพื่อบอกชื่อลูกค้า
         const modalLabel = document.getElementById('detailModalLabel');
         modalLabel.innerHTML = `
           <span class="border border-primary p-2 text-primary fw-bold">
@@ -620,7 +593,6 @@
       row.querySelector(".procedure-short-code").value = selectedOption.dataset.shortCode;
       row.querySelector(".procedure-price").value = selectedOption.dataset.price;
 
-      // ตั้งค่า pr_price1 = ราคาเต็ม
       const prPrice1Field = row.querySelector(".pr-price1");
       if (prPrice1Field) {
         prPrice1Field.value = selectedOption.dataset.price || 0;
@@ -756,7 +728,6 @@
       </div>
     `;
     depositContainer.appendChild(newRow);
-    // ให้ row ใหม่นี้ updatePayment ได้
     newRow.querySelector(".deposit-input").addEventListener("input", updateTotalPaymentDisplay);
   }
   function removeDepositRow(button) {
@@ -775,7 +746,6 @@
   // 10) ก่อน submit -> รวมค่า procedures เป็น JSON และ validate
   // --------------------------------------------------
   function prepareProceduresData() {
-    // 10.1) รวมค่า Procedures
     const procedureList = document.getElementById("procedureList");
     const rows = procedureList.getElementsByClassName("procedure-row");
     let proceduresArray = [];
@@ -799,7 +769,6 @@
     }
     document.getElementById("procedures_data").value = JSON.stringify(proceduresArray);
 
-    // 10.2) เช็คยอด (Front-end) ถ้าต้องการ
     const totalProcPrice = parseInt(document.getElementById("totalProcedurePrice").innerText) || 0;
     let depositSum = 0;
     const depositInputs = document.getElementsByClassName("deposit-input");
@@ -813,9 +782,8 @@
     
     if (totalProcPrice !== totalPayment) {
       alert(`ยอดชำระ (${totalPayment}) ไม่เท่ากับราคาหัตถการ (${totalProcPrice}) กรุณาตรวจสอบ`);
-      return false; // ไม่ submit
+      return false;
     }
-    // Confirm
     if (!confirm("ยืนยันบันทึกข้อมูล?")) {
       return false;
     }

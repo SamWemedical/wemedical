@@ -7689,34 +7689,6 @@ def read_notification(nid):
     return redirect(url_for('my_notifications'))
 
 
-
-### -------------------------------------------
-### Export CSV for OT
-### -------------------------------------------
-@app.route('/export_attendance')
-@role_required('Admin','HR')
-def export_attendance():
-    conn = get_db_connection()
-    rows = conn.execute("""
-        SELECT attendance_id, user_id, checkin_time, checkout_time, ot_status
-        FROM attendance
-        ORDER BY attendance_id
-    """).fetchall()
-    conn.close()
-
-    output = StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["attendance_id","user_id","checkin_time","checkout_time","ot_status"])
-    for r in rows:
-        writer.writerow([r['attendance_id'], r['user_id'], r['checkin_time'], r['checkout_time'], r['ot_status']])
-
-    resp = make_response(output.getvalue())
-    resp.headers["Content-Disposition"] = "attachment; filename=attendance.csv"
-    resp.headers["Content-type"] = "text/csv"
-    return resp
-
-
-
 ### -------------------------------------------
 ### Salary Setup ปรับฐานเงินเดือน
 ### -------------------------------------------
@@ -8971,29 +8943,62 @@ def customer_database_indo():
         current_date = datetime.now().strftime('%Y-%m-%d')
         return render_template('opd/customer_database_indo.html', current_date=current_date)
 
-# 4. View Customer List
-@app.route('/customer_list')
-@role_required('OPD', 'ADMIN', 'DOCTOR')
-def customer_list():
-    page = request.args.get('page', 1, type=int)
-    per_page = 100
-    offset = (page - 1) * per_page
-    
-    conn = get_db_connection()
-    total = conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
-    customers = conn.execute("SELECT * FROM customers ORDER BY hn DESC LIMIT ? OFFSET ?", (per_page, offset)).fetchall()
-    conn.close()
-    
-    customer_list = []
-    for customer in customers:
-        customer_dict = dict(customer)
-        birthday_val = customer_dict.get('birthday', '')
-        customer_dict['calculated_age'] = calculate_age(birthday_val)
-        customer_list.append(customer_dict)
-     
-    total_pages = (total + per_page - 1) // per_page
+# 4.1 fromjson
+@app.template_filter('fromjson')
+def fromjson_filter(s):
+    try:
+        return json.loads(s) if s else []
+    except Exception:
+        return []
 
-    return render_template('opd/customer_list.html', customers=customer_list, page=page, total_pages=total_pages)
+# 4.2 View Customer List
+@app.route('/customer_list')
+@role_required('ADMIN', 'OPD')
+def customer_list():
+    conn = get_db_connection()
+    page = int(request.args.get('page', 1))
+    per_page = 50
+    offset = (page - 1) * per_page
+    search_query = request.args.get('q', '').strip()
+    search_results = None
+
+    if search_query:
+        customers = conn.execute("""
+            SELECT * FROM customers 
+            WHERE hn LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR nickname LIKE ? OR phone LIKE ?
+            ORDER BY hn DESC
+            LIMIT ? OFFSET ?
+        """, (
+            f"%{search_query}%", f"%{search_query}%", f"%{search_query}%", 
+            f"%{search_query}%", f"%{search_query}%", per_page, offset
+        )).fetchall()
+        total_count = conn.execute("""
+            SELECT COUNT(*) as count FROM customers 
+            WHERE hn LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR nickname LIKE ? OR phone LIKE ?
+        """, (
+            f"%{search_query}%", f"%{search_query}%", f"%{search_query}%", 
+            f"%{search_query}%", f"%{search_query}%"
+        )).fetchone()['count']
+        total_pages = (total_count // per_page) + (1 if total_count % per_page else 0)
+        search_results = customers
+    else:
+        customers = conn.execute("""
+            SELECT * FROM customers 
+            ORDER BY hn DESC
+            LIMIT ? OFFSET ?
+        """, (per_page, offset)).fetchall()
+        total_count = conn.execute("SELECT COUNT(*) as count FROM customers").fetchone()['count']
+        total_pages = (total_count // per_page) + (1 if total_count % per_page else 0)
+    conn.close()
+
+    return render_template(
+        'opd/customer_list.html',
+        customers=customers,
+        search_results=search_results,
+        search_query=search_query,
+        total_pages=total_pages,
+        page=page
+    )
 
 # 5. Search Customer List
 @app.route('/search_customer', methods=['GET'])
@@ -9207,6 +9212,13 @@ def daily_income():
         # --- 1) อ่านค่าและ Validate ฝั่ง Backend ---
         customer_id = request.form.get('customer_id')
         deposit_date = request.form.get('deposit_date_0')
+        # อ่านวันที่บันทึกจากฟอร์ม (รองรับการเลือกย้อนหลัง)
+        record_date = request.form.get('record_date', datetime.now().strftime('%Y-%m-%d'))
+        
+        # ตรวจสอบว่าไม่อนุญาตให้บันทึกวันที่ในอนาคต
+        if datetime.strptime(record_date, '%Y-%m-%d') > datetime.now():
+            flash("ไม่สามารถบันทึกวันที่ในอนาคตได้", "danger")
+            return redirect(url_for('daily_income'))
 
         # 1.1) คำนวณยอดการชำระเงิน (deposit, cash, transfer, credit_card, ...)
         try:
@@ -9231,7 +9243,6 @@ def daily_income():
             return redirect(url_for('daily_income'))
         
         # --- 2) บันทึกลงฐานข้อมูล (Insert) ---
-        record_date = datetime.now().strftime('%Y-%m-%d')
         created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         conn = get_db_connection()
@@ -9259,6 +9270,27 @@ def daily_income():
             # Insert Details
             for proc in procedures_data:
                 _insert_daily_income_detail(conn, header_id, proc, created_at)
+
+            # --- New Section: Update customers.service_type for eligible procedures ---
+            # เฉพาะหัตถการที่อยู่ในหมวด 'SX' และ 'AES'
+            service_updates = []
+            for proc in procedures_data:
+                if proc.get('procedure_category') in ['SX', 'AES']:
+                    short_code = proc.get('procedure_short_code')
+                    if short_code:
+                        service_updates.append({"short_code": short_code, "record_date": record_date})
+            if service_updates:
+                # อ่านข้อมูล service_type เดิมจากตาราง customers
+                customer_row = conn.execute("SELECT service_type FROM customers WHERE id = ?", (customer_id,)).fetchone()
+                existing_services = []
+                if customer_row and customer_row['service_type']:
+                    try:
+                        existing_services = json.loads(customer_row['service_type'])
+                    except Exception:
+                        existing_services = []
+                # รวมข้อมูลใหม่เข้ากับข้อมูลเดิม
+                existing_services.extend(service_updates)
+                conn.execute("UPDATE customers SET service_type = ? WHERE id = ?", (json.dumps(existing_services), customer_id))
 
             conn.commit()
             flash("Daily income record added successfully", "success")
@@ -9313,7 +9345,7 @@ def daily_income():
             sum_credit_card += row['credit_card'] or 0
             sum_credit_card_fee += row['credit_card_fee'] or 0
 
-        # ดึงข้อมูลอื่น ๆ
+        # ดึงข้อมูลอื่น ๆ สำหรับการแสดงผล
         doctors = conn.execute("SELECT doctor_id, short_name FROM doctors").fetchall()
         procedures = conn.execute("SELECT id, category_name, procedure_name, short_code, price FROM procedures").fetchall()
         procedures = [dict(r) for r in procedures]
@@ -9327,7 +9359,6 @@ def daily_income():
             doctors=doctors,
             procedures=procedures,
             users=users,
-            # ส่งตัวแปรสรุปไป Template
             sum_total_price=sum_total_price,
             sum_deposit=sum_deposit,
             sum_cash=sum_cash,
@@ -9335,7 +9366,7 @@ def daily_income():
             sum_credit_card=sum_credit_card,
             sum_credit_card_fee=sum_credit_card_fee
         )
-    
+      
 # 1.1 Get Daily Income Detail
 @app.route('/get_daily_income_detail', methods=['GET'])
 @role_required("OPD", "ADMIN")
