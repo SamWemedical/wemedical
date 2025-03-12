@@ -15,7 +15,7 @@ import json
 import calendar
 
 from db import get_db_connection
-from auth_decorators import role_required
+from auth_decorators import role_required, get_months
 
 locale.setlocale(locale.LC_TIME, "th_TH.UTF-8")
 
@@ -239,6 +239,34 @@ def init_db():
             updated_at TEXT,
             PRIMARY KEY (user_id, year, month),
             FOREIGN KEY (user_id) REFERENCES users(user_id)
+        );
+    """)
+
+    # patient_followup_reminders
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS patient_followup_reminders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_id INTEGER NOT NULL,
+            procedure_id INTEGER NOT NULL,
+            reminder_type TEXT NOT NULL,  -- 'stitchoff' หรือ 'followup'
+            scheduled_date TEXT NOT NULL,
+            call_status TEXT DEFAULT 'Pending',
+            remarks TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT,
+            FOREIGN KEY (customer_id) REFERENCES customers(id),
+            FOREIGN KEY (procedure_id) REFERENCES procedures(id)
+        );
+    """)
+
+    # doctor_availability
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS doctor_availability (
+            doctor_id INTEGER,
+            date TEXT,
+            available INTEGER,  -- 1 = available, 0 = not available
+            PRIMARY KEY (doctor_id, date),
+            FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id)
         );
     """)
 
@@ -671,7 +699,7 @@ def initialize_default_workflow_configurations():
         "delete_daily_income": {"require_subcategory": 1, "allowed_subcategory_ids": "14", "description": "เฉพาะ ฝ่ายบัญชี"},
         "search_customer_for_daily_income": {"require_subcategory": 1, "allowed_subcategory_ids": "14", "description": "เฉพาะ ฝ่ายบัญชี"},
         "aes_commission_rate": {"require_subcategory": 1, "allowed_subcategory_ids": "1,5", "description": "เฉพาะ หัวหน้า OR"},
-        "aes_commission_assignment": {"require_subcategory": 1, "allowed_subcategory_ids": "5,10", "description": "เฉพาะ แผนก OR"},
+        "aes_commission_assignment": {"require_subcategory": 1, "allowed_subcategory_ids": "1,5,10", "description": "เฉพาะ แผนก OR"},
         "pr_income_summary": {"require_subcategory": 1, "allowed_subcategory_ids": "4,5,9,16", "description": "เฉพาะ PR"},
         "translate_commission": {"require_subcategory": 1, "allowed_subcategory_ids": "1,2,9", "description": "เฉพาะ PA INDO"},
 
@@ -2696,24 +2724,6 @@ def get_previous_payrolls(user_id, months_to_fetch=3):
     return previous_payrolls
 
 
-# ดึงข้อมูลเดือน
-def get_months():
-    return [
-        {"value": 1, "name": "มกราคม"},
-        {"value": 2, "name": "กุมภาพันธ์"},
-        {"value": 3, "name": "มีนาคม"},
-        {"value": 4, "name": "เมษายน"},
-        {"value": 5, "name": "พฤษภาคม"},
-        {"value": 6, "name": "มิถุนายน"},
-        {"value": 7, "name": "กรกฎาคม"},
-        {"value": 8, "name": "สิงหาคม"},
-        {"value": 9, "name": "กันยายน"},
-        {"value": 10, "name": "ตุลาคม"},
-        {"value": 11, "name": "พฤศจิกายน"},
-        {"value": 12, "name": "ธันวาคม"},
-    ]
-
-
 
 ### -------------------------------
 ### Log in & Log out
@@ -4233,12 +4243,6 @@ def check_in_out():
 @app.route('/ot_summary', methods=['GET', 'POST'])
 @role_required('EMPLOYEE', 'HR', 'MANAGER', 'SECRETARY')
 def ot_summary():
-    """
-    สรุปเวลาทำงานของตัวเอง พร้อมตัวเลือกเดือนปัจจุบันและเดือนที่แล้ว
-    """
-    from datetime import datetime
-    from calendar import monthrange
-
     # ดึงค่าเดือนและปีจาก POST หรือใช้ค่าเริ่มต้น (เดือนปัจจุบัน)
     if request.method == 'POST':
         year = int(request.form.get('year'))
@@ -4310,10 +4314,12 @@ def ot_summary():
 
     conn.close()
 
+    months = get_months()
     return render_template(
         'check_in_out/ot_summary.html',
         year=year,
         month=month,
+        months=months,
         summary_data=summary_data,
         total_late=total_late,
         total_ot_before=format_hh_mm(total_ot_before),
@@ -4592,6 +4598,7 @@ def schedule_editor_step1():
             {'id': 'SECRETARY', 'label': 'SECRETARY'}
         ]
 
+        months = get_months()
         return render_template(
             "hr/schedule_editor_step1.html",
             user_list=user_list,
@@ -4842,7 +4849,7 @@ def ot_summary_step1():
 
         current_year = datetime.now().year
         years = list(range(current_year - 3, current_year + 1))
-        months = [{'value': i, 'name': f"เดือน {i}"} for i in range(1, 13)]
+        months = get_months()
 
         return render_template(
             "hr/ot_summary_step1.html",
@@ -6247,7 +6254,14 @@ def loan_deduction():
         """, (current_year, current_month)).fetchall()
         conn.close()
 
-        return render_template('hr/loan_deduction.html', users=users, current_year=current_year, current_month=current_month)
+        months = get_months()
+
+        return render_template('hr/loan_deduction.html', 
+                               users=users,
+                               
+                               months=months,
+                               current_year=current_year, 
+                               current_month=current_month)
 
 # หัก กยศ. (ประวัติย้อนหลัง 12 เดือน)
 @app.route('/hr/loan_deduction_history', methods=['GET'])
@@ -7949,12 +7963,13 @@ def payroll_summary_all():
             u.first_name,
             u.last_name,
             u.nickname,
+            u.start_date,
             MAX(sr.base_salary) AS base_salary
         FROM users u
         JOIN salary_records sr ON sr.user_id = u.user_id
         WHERE sr.base_salary > 0
         GROUP BY u.user_id
-        ORDER BY u.user_id
+        ORDER BY u.start_date
     """).fetchall()
 
     conn.close()
@@ -8131,12 +8146,15 @@ def payroll_summary_all():
         final_row["value_map"][uid] = val
     row_data.append(final_row)
 
+    months = get_months
+
     return render_template(
         "payroll/payroll_summary_all.html",
         row_data=row_data,
         user_list=user_rows,
         year=year,
-        month=month
+        month=month,
+        months=months
     )
 
 # Payday config จัดการวันที่เงินเดือน / ค่าคอมฯออก
@@ -8257,11 +8275,17 @@ def manage_payday_config():
             }
 
         conn.close()
+
+        months = get_months()
+        month_name = next((m['name'] for m in months if m['value'] == month), month)
         return render_template(
             'hr/payday_config.html',
             user_rows=user_rows,
             cfg_map=cfg_map,
-            year=year, month=month,
+            year=year, 
+            month=month, 
+            months=months, 
+            month_name=month_name,
             global_salary=global_salary,
             global_welfare=global_welfare
         )
@@ -9212,39 +9236,30 @@ def daily_income():
         # --- 1) อ่านค่าและ Validate ฝั่ง Backend ---
         customer_id = request.form.get('customer_id')
         deposit_date = request.form.get('deposit_date_0')
-        # อ่านวันที่บันทึกจากฟอร์ม (รองรับการเลือกย้อนหลัง)
         record_date = request.form.get('record_date', datetime.now().strftime('%Y-%m-%d'))
-        
-        # ตรวจสอบว่าไม่อนุญาตให้บันทึกวันที่ในอนาคต
         if datetime.strptime(record_date, '%Y-%m-%d') > datetime.now():
             flash("ไม่สามารถบันทึกวันที่ในอนาคตได้", "danger")
             return redirect(url_for('daily_income'))
-
-        # 1.1) คำนวณยอดการชำระเงิน (deposit, cash, transfer, credit_card, ...)
+        
         try:
             deposit, cash, transfer, credit_card, credit_card_fee = _calculate_payment(request)
         except ValueError as e:
             flash(str(e), "danger")
             return redirect(url_for('daily_income'))
-
-        # 1.2) ดึง Procedures JSON + คำนวณราคารวม
+        
         try:
             procedures_data = json.loads(request.form.get('procedures_data', '[]'))
         except Exception as e:
             flash(f"Invalid procedures data: {e}", "danger")
             return redirect(url_for('daily_income'))
-
+        
         total_price = _calculate_total_price_from_procedures(procedures_data)
-
-        # 1.3) ตรวจสอบว่าราคารวม == ยอดชำระ
         total_payment = deposit + cash + transfer + credit_card
         if total_payment != total_price:
             flash(f"ยอดชำระ ({total_payment}) ไม่เท่ากับราคารวม ({total_price}) กรุณาตรวจสอบอีกครั้ง", "danger")
             return redirect(url_for('daily_income'))
         
-        # --- 2) บันทึกลงฐานข้อมูล (Insert) ---
         created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
         conn = get_db_connection()
         try:
             # Insert Header
@@ -9253,26 +9268,14 @@ def daily_income():
                 (record_date, customer_id, total_price, deposit, deposit_date,
                  cash, transfer, credit_card, credit_card_fee, created_at)
                 VALUES (?,?,?,?,?,?,?,?,?,?)
-            """, (
-                record_date,
-                customer_id,
-                total_price,
-                deposit,
-                deposit_date,
-                cash,
-                transfer,
-                credit_card,
-                credit_card_fee,
-                created_at
-            ))
+            """, (record_date, customer_id, total_price, deposit, deposit_date, cash, transfer, credit_card, credit_card_fee, created_at))
             header_id = cursor.lastrowid
-
+            
             # Insert Details
             for proc in procedures_data:
                 _insert_daily_income_detail(conn, header_id, proc, created_at)
 
-            # --- New Section: Update customers.service_type for eligible procedures ---
-            # เฉพาะหัตถการที่อยู่ในหมวด 'SX' และ 'AES'
+            # บันทึก service_type สำหรับหัตถการในหมวด 'SX' และ 'AES'
             service_updates = []
             for proc in procedures_data:
                 if proc.get('procedure_category') in ['SX', 'AES']:
@@ -9280,7 +9283,6 @@ def daily_income():
                     if short_code:
                         service_updates.append({"short_code": short_code, "record_date": record_date})
             if service_updates:
-                # อ่านข้อมูล service_type เดิมจากตาราง customers
                 customer_row = conn.execute("SELECT service_type FROM customers WHERE id = ?", (customer_id,)).fetchone()
                 existing_services = []
                 if customer_row and customer_row['service_type']:
@@ -9288,27 +9290,53 @@ def daily_income():
                         existing_services = json.loads(customer_row['service_type'])
                     except Exception:
                         existing_services = []
-                # รวมข้อมูลใหม่เข้ากับข้อมูลเดิม
                 existing_services.extend(service_updates)
                 conn.execute("UPDATE customers SET service_type = ? WHERE id = ?", (json.dumps(existing_services), customer_id))
-
+            
+            # --- Create follow-up reminders for procedures in category SX ---
+            for proc in procedures_data:
+                if proc.get('procedure_category') == 'SX':
+                    procedure_id = proc.get('procedure_id')
+                    # สร้าง reminder สำหรับนัดตัดไหม (stitchoff)
+                    reminder_stitchoff = proc.get('reminder_stitchoff')
+                    if reminder_stitchoff:
+                        try:
+                            offset = int(reminder_stitchoff)
+                            scheduled_date = (datetime.strptime(record_date, '%Y-%m-%d') + timedelta(days=offset)).strftime('%Y-%m-%d')
+                            conn.execute("""
+                                INSERT INTO patient_followup_reminders
+                                (customer_id, procedure_id, reminder_type, scheduled_date, call_status, created_at)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            """, (customer_id, procedure_id, 'stitchoff', scheduled_date, 'Pending', created_at))
+                        except Exception as e:
+                            pass
+                    # สร้าง reminder สำหรับนัดติดตามผล (followup)
+                    reminder_followup = proc.get('reminder_followup')
+                    if reminder_followup:
+                        try:
+                            offset = int(reminder_followup)
+                            scheduled_date = (datetime.strptime(record_date, '%Y-%m-%d') + timedelta(days=offset)).strftime('%Y-%m-%d')
+                            conn.execute("""
+                                INSERT INTO patient_followup_reminders
+                                (customer_id, procedure_id, reminder_type, scheduled_date, call_status, created_at)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            """, (customer_id, procedure_id, 'followup', scheduled_date, 'Pending', created_at))
+                        except Exception as e:
+                            pass
+            
             conn.commit()
             flash("Daily income record added successfully", "success")
-        
         except Exception as e:
             conn.rollback()
             flash(f"An error occurred: {e}", "danger")
-        
         finally:
             conn.close()
-        
         return redirect(url_for('daily_income'))
     
     else:
         # --- GET ---
         record_date = request.args.get('record_date', datetime.now().strftime('%Y-%m-%d'))
         current_date = datetime.now().strftime('%Y-%m-%d')
-        
         conn = get_db_connection()
         daily_income_list = conn.execute("""
             SELECT 
@@ -9328,30 +9356,21 @@ def daily_income():
             WHERE dih.record_date = ?
             ORDER BY dih.id ASC
         """, (record_date,)).fetchall()
-
-        # สะสมผลรวมใน Python
-        sum_total_price = 0
-        sum_deposit = 0
-        sum_cash = 0
-        sum_transfer = 0
-        sum_credit_card = 0
-        sum_credit_card_fee = 0
         
-        for row in daily_income_list:
-            sum_total_price += row['total_price'] or 0
-            sum_deposit += row['deposit'] or 0
-            sum_cash += row['cash'] or 0
-            sum_transfer += row['transfer'] or 0
-            sum_credit_card += row['credit_card'] or 0
-            sum_credit_card_fee += row['credit_card_fee'] or 0
-
-        # ดึงข้อมูลอื่น ๆ สำหรับการแสดงผล
+        # สะสมผลรวม
+        sum_total_price = sum([row['total_price'] or 0 for row in daily_income_list])
+        sum_deposit = sum([row['deposit'] or 0 for row in daily_income_list])
+        sum_cash = sum([row['cash'] or 0 for row in daily_income_list])
+        sum_transfer = sum([row['transfer'] or 0 for row in daily_income_list])
+        sum_credit_card = sum([row['credit_card'] or 0 for row in daily_income_list])
+        sum_credit_card_fee = sum([row['credit_card_fee'] or 0 for row in daily_income_list])
+        
         doctors = conn.execute("SELECT doctor_id, short_name FROM doctors").fetchall()
         procedures = conn.execute("SELECT id, category_name, procedure_name, short_code, price FROM procedures").fetchall()
         procedures = [dict(r) for r in procedures]
         users = conn.execute("SELECT user_id, pr_code FROM users").fetchall()
         conn.close()
-
+        
         return render_template('opd/daily_income.html',
             current_date=current_date,
             record_date=record_date,
@@ -9625,6 +9644,102 @@ def search_customer_for_daily_income():
             'phone': row['phone']
         })
     return jsonify(data_list)
+
+# Doctor Calendar
+@app.route('/doctor_calendar', methods=['GET'])
+@role_required("OPD", "ADMIN")
+def doctor_calendar():
+    # Get year and month; default to current month/year
+    year = request.args.get('year', datetime.now().year, type=int)
+    month = request.args.get('month', datetime.now().month, type=int)
+    days_in_month = calendar.monthrange(year, month)[1]
+    start_date = f"{year}-{month:02d}-01"
+    end_date = f"{year}-{month:02d}-{days_in_month:02d}"
+    
+    conn = get_db_connection()
+    # Query doctor availability for this month
+    rows = conn.execute("""
+        SELECT * FROM doctor_availability
+        WHERE date BETWEEN ? AND ?
+    """, (start_date, end_date)).fetchall()
+    # Build a dictionary: date -> { doctor_id: available }
+    doctor_availability_data = {}
+    for day in range(1, days_in_month+1):
+        date_str = f"{year}-{month:02d}-{day:02d}"
+        doctor_availability_data[date_str] = {}
+    for row in rows:
+        date_str = row['date']
+        if date_str in doctor_availability_data:
+            doctor_availability_data[date_str][row['doctor_id']] = row['available']
+    
+    # Get list of doctors
+    doctors = conn.execute("SELECT doctor_id, short_name FROM doctors").fetchall()
+    conn.close()
+    
+    # Build calendar weeks (starting on Sunday)
+    cal = calendar.Calendar(firstweekday=6)
+    month_days = list(cal.itermonthdates(year, month))
+    weeks = []
+    week = []
+    for day in month_days:
+        if day.month != month:
+            week.append(None)
+        else:
+            week.append(day.strftime('%Y-%m-%d'))
+        if len(week) == 7:
+            weeks.append(week)
+            week = []
+    if week:
+        weeks.append(week)
+    
+    months = get_months()
+    return render_template("opd/doctor_calendar.html",
+                           year=year,
+                           month=month,
+                           months=months,
+                           weeks=weeks,
+                           doctor_availability_data=doctor_availability_data,
+                           doctors=doctors)
+
+# Update Doctor Availability
+@app.route('/update_doctor_availability', methods=['POST'])
+@role_required("OPD", "ADMIN")
+def update_doctor_availability():
+    data = request.get_json()
+    date_str = data.get("date")
+    doctor_id = data.get("doctor_id")
+    available = data.get("available")
+    conn = get_db_connection()
+    try:
+        conn.execute("""
+            INSERT INTO doctor_availability (doctor_id, date, available)
+            VALUES (?, ?, ?)
+            ON CONFLICT(doctor_id, date) DO UPDATE SET available=excluded.available
+        """, (doctor_id, date_str, 1 if available else 0))
+        conn.commit()
+        return json.dumps({"success": True}), 200, {'Content-Type': 'application/json'}
+    except Exception as e:
+        conn.rollback()
+        return json.dumps({"success": False, "error": str(e)}), 500, {'Content-Type': 'application/json'}
+    finally:
+        conn.close()
+
+# ดึงรายละเอียดตามวันที่
+@app.route('/get_reminders_by_date', methods=['GET'])
+@role_required("OPD", "ADMIN")
+def get_reminders_by_date():
+    date_str = request.args.get('date')
+    conn = get_db_connection()
+    reminders = conn.execute("""
+        SELECT pr.*, d.short_name AS doctor_short_name 
+        FROM patient_followup_reminders pr
+        JOIN doctors d ON pr.procedure_id = d.doctor_id
+        WHERE scheduled_date = ?
+    """, (date_str,)).fetchall()
+    conn.close()
+    # แปลงผลลัพธ์เป็น list of dict
+    reminders_list = [dict(r) for r in reminders]
+    return json.dumps(reminders_list)
 
 
 
@@ -10518,11 +10633,13 @@ def aes_commission_assignment():
 
         possible_months = range(1,13)
         possible_years = range(today.year-1, today.year+2)
+        months = get_months()
 
         return render_template('or/aes_commission.html',
                                detail_list=detail_list,
                                user_list=user_rows,
                                month=month,
+                               months=months,
                                year=year,
                                possible_months=possible_months,
                                possible_years=possible_years)
@@ -10709,12 +10826,17 @@ def translate_commission():
         possible_years = range(today.year-1, today.year+2)
         possible_months = range(1,13)
 
+        months = get_months()
+        month_name = next((m['name'] for m in months if m['value'] == month), month)
+
         return render_template("pa/translate_commission.html",
             row_list=show_list,
             user_list=user_list,
             role=user_role,
             filter_user_id_str=filter_user_id_str,
             month=month,
+            months=months,
+            month_name=month_name,
             year=year,
             possible_years=possible_years,
             possible_months=possible_months
@@ -10834,8 +10956,14 @@ def credit_commission():
 
         conn.close()
 
+        months = get_months()
+        month_name = next((m['name'] for m in months if m['value'] == month), month)
+
         return render_template('mkt/credit_commission.html',
-                               year=year, month=month,
+                               year=year, 
+                               month=month,
+                               months=months,
+                               month_name=month_name,
                                user_rows=user_rows,
                                cc_map=cc_map,  # ใช้ prefill ใน form
                                history_data=history_data

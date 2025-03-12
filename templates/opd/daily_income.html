@@ -301,6 +301,18 @@
       <input type="number" class="form-control procedure-price" name="procedure_price" readonly>
     </div>
 
+    <!-- Reminder Inputs -->
+    <div class="row mb-3">
+      <div class="col">
+        <label class="form-label">นัดตัดไหม (วัน)</label>
+        <input type="number" class="form-control reminder-stitchoff" name="reminder_stitchoff" placeholder="จำนวนวัน">
+      </div>
+      <div class="col">
+        <label class="form-label">นัดติดตามผล (วัน)</label>
+        <input type="number" class="form-control reminder-followup" name="reminder_followup" placeholder="จำนวนวัน">
+      </div>
+    </div>
+
     <!-- PR Section -->
     <h5>การกระจาย PR</h5>
     <div class="row mb-3">
@@ -763,12 +775,14 @@
         pr_code2: row.querySelector('.pr-code2').value,
         pr_price2: row.querySelector('.pr-price2').value,
         pr_code3: row.querySelector('.pr-code3').value,
-        pr_price3: row.querySelector('.pr-price3').value
+        pr_price3: row.querySelector('.pr-price3').value,
+        reminder_stitchoff: row.querySelector('.reminder-stitchoff') ? row.querySelector('.reminder-stitchoff').value : "",
+        reminder_followup: row.querySelector('.reminder-followup') ? row.querySelector('.reminder-followup').value : ""
       };
       proceduresArray.push(procedureData);
     }
     document.getElementById("procedures_data").value = JSON.stringify(proceduresArray);
-
+  
     const totalProcPrice = parseInt(document.getElementById("totalProcedurePrice").innerText) || 0;
     let depositSum = 0;
     const depositInputs = document.getElementsByClassName("deposit-input");
@@ -789,6 +803,7 @@
     }
     return true;
   }
+  
 
   // --------------------------------------------------
   // 11) onload -> auto addProcedureRow() ถ้าไม่มี

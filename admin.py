@@ -4,7 +4,7 @@ from datetime import date, datetime
 import calendar
 
 from db import get_db_connection
-from auth_decorators import role_required
+from auth_decorators import role_required, get_months
 
 admin_bp = Blueprint('admin_bp', __name__, url_prefix='/admin')
 
@@ -208,10 +208,6 @@ def manage_doctors():
 @admin_bp.route('/doctor_income_summary', methods=['GET'])
 @role_required('ADMIN')  # ให้เฉพาะ Admin เท่านั้นที่เข้าถึงได้
 def admin_doctor_income_summary():
-    """
-    แสดงสรุปยอดรายเดือนของแพทย์ทั้งหมด (เฉพาะยอดรวมและค่าแพทย์)
-    โดยไม่แสดงรายละเอียดของแต่ละเคส
-    """
     # รับค่า month/year จาก GET parameter
     today = date.today()
     default_year  = today.year
@@ -265,12 +261,15 @@ def admin_doctor_income_summary():
             'aes_fee': aes_fee,
             'total_fee': total_fee
         })
+    
+    months = get_months()
 
     # ส่งข้อมูลสรุปไปยัง template สำหรับ Admin
     return render_template(
         'admin/doctor_income_summary.html',
         year=year,
         month=month,
+        months=months,
         summaries=summaries
     )
 

@@ -22,18 +22,18 @@
   <form method="GET" action="">
     <div class="row g-2 align-items-end mb-3">
       <div class="col-auto">
-        <label>ปี:</label>
-        <select name="year" class="form-select">
-          {% for y in possible_years %}
-          <option value="{{ y }}" {% if y==year %}selected{% endif %}>{{ y }}</option>
+        <label>เดือน:</label>
+        <select name="month" class="form-select">
+          {% for m in months %}
+            <option value="{{ m.value }}" {% if m.value == month %}selected{% endif %}>{{ m.name }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="col-auto">
-        <label>เดือน:</label>
-        <select name="month" class="form-select">
-          {% for m in possible_months %}
-          <option value="{{ m }}" {% if m==month %}selected{% endif %}>{{ m }}</option>
+        <label>ปี:</label>
+        <select name="year" class="form-select">
+          {% for y in possible_years %}
+          <option value="{{ y }}" {% if y==year %}selected{% endif %}>{{ y }}</option>
           {% endfor %}
         </select>
       </div>

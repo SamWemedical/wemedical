@@ -10,13 +10,17 @@
   <h2>สรุปยอดรายเดือนของแพทย์</h2>
   <form method="GET" action="">
     <div class="row mb-3">
+      <div class="col-md-3">
+        <label for="month" class="form-label">เดือน</label>
+        <select name="month" id="month" class="form-select">
+          {% for m in months %}
+            <option value="{{ m.value }}" {% if m.value == month %}selected{% endif %}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </div>      
       <div class="col">
         <label>ปี</label>
         <input type="number" name="year" class="form-control" value="{{ year }}">
-      </div>
-      <div class="col">
-        <label>เดือน</label>
-        <input type="number" name="month" class="form-control" value="{{ month }}">
       </div>
       <div class="col">
         <button type="submit" class="btn btn-primary mt-4">แสดงผล</button>
@@ -76,6 +80,7 @@
       </tr>
     </tfoot>
   </table>  
+  <a href="/dashboard" class="btn btn-secondary"> กลับสู่หน้าหลัก</a>
 </div>
 </body>
 </html>

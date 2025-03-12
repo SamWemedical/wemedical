@@ -20,18 +20,18 @@
 
   <form method="GET" class="row g-2 mb-3">
     <div class="col-auto">
-      <label>ปี:</label>
-      <select name="year" class="form-select">
-        {% for y in possible_years %}
-        <option value="{{y}}" {% if y==year %}selected{% endif %}>{{y}}</option>
+      <label>เดือน:</label>
+      <select name="month" class="form-select">
+        {% for m in months %}
+        <option value="{{ m.value }}" {% if m.value == month %}selected{% endif %}>{{ m.name }}</option>
         {% endfor %}
       </select>
     </div>
     <div class="col-auto">
-      <label>เดือน:</label>
-      <select name="month" class="form-select">
-        {% for m in possible_months %}
-        <option value="{{m}}" {% if m==month %}selected{% endif %}>{{m}}</option>
+      <label>ปี:</label>
+      <select name="year" class="form-select">
+        {% for y in possible_years %}
+        <option value="{{y}}" {% if y==year %}selected{% endif %}>{{y}}</option>
         {% endfor %}
       </select>
     </div>
@@ -62,7 +62,7 @@
     <button type="button" class="btn btn-secondary mb-3" onclick="addNewLine()">+ เพิ่มรายการใหม่</button>
 
     <hr>
-    <h4>ตารางแสดงผล (เดือน={{month}}, year={{year}})</h4>
+    <h4>{{month_name}} / {{year}}</h4>
     <table class="table table-bordered">
       <thead class="table-light">
         <tr>

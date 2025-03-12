@@ -31,19 +31,19 @@
   <!-- เลือกเดือน/ปี -->
   <form method="GET" class="row g-2 mb-3">
     <div class="col-auto">
+      <label>เดือน</label>
+      <select name="month" class="form-select">
+        {% for m in months %}
+        <option value="{{ m.value }}" {% if m.value == month %}selected{% endif %}>{{ m.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
       <label>ปี</label>
       <select name="year" class="form-select">
         {% set this_year = year %}
         {% for y in range(this_year-1, this_year+2) %}
         <option value="{{y}}" {% if y==year %}selected{% endif %}>{{y}}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-auto">
-      <label>เดือน</label>
-      <select name="month" class="form-select">
-        {% for m in range(1,13) %}
-        <option value="{{m}}" {% if m==month %}selected{% endif %}>{{m}}</option>
         {% endfor %}
       </select>
     </div>
@@ -73,17 +73,17 @@
                  value="{{ global_welfare|default(10) }}">
         </div>
         <div class="col-auto">
-          <button type="submit" class="btn btn-danger">บันทึกสำหรับทุกคน (เดือน {{month}}/{{year}})</button>
+          <button type="submit" class="btn btn-success">บันทึกสำหรับทุกคน ({{month_name}}/{{year}})</button>
         </div>
       </form>
     </div>
   </div>
 
-  <h3>แก้ไขวันที่ (รายบุคคล)  . . .  เดือน {{month}} / {{year}}</h3>
+  <h3>แก้ไขวันที่ (รายบุคคล) -- {{month_name}} / {{year}}</h3>
   <table class="table table-bordered table-hover">
     <thead>
       <tr>
-        <th>ID</th>
+        <th>#</th>
         <th>ชื่อ-นามสกุล</th>
         <th>ชื่อเล่น</th>
         <th>วันจ่ายเงินเดือน</th>
@@ -95,7 +95,7 @@
       {% for u in user_rows %}
       {% set config = cfg_map[u.user_id] if u.user_id in cfg_map else None %}
       <tr>
-        <td>{{ u.user_id }}</td>
+        <td>{{ loop.index }}</td>
         <td>{{ u.first_name }} {{ u.last_name }}</td>
         <td>{{ u.nickname }}</td>
         <td>

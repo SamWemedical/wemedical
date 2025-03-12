@@ -41,21 +41,19 @@
     </div>
     <div class="card-body">
       <form method="GET" action="{{ url_for('ot_summary_step1') }}">
-        <!-- เลือกปี -->
-        <div class="mb-3">
-          <label for="year" class="form-label">ปี:</label>
-          <select id="year" name="year" class="form-select">
-            {% for y in years %}
-              <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <!-- เลือกเดือน -->
         <div class="mb-3">
           <label for="month" class="form-label">เดือน:</label>
           <select id="month" name="month" class="form-select">
             {% for m in months %}
               <option value="{{ m.value }}" {% if m.value == current_month %}selected{% endif %}>{{ m.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label for="year" class="form-label">ปี:</label>
+          <select id="year" name="year" class="form-select">
+            {% for y in years %}
+              <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
             {% endfor %}
           </select>
         </div>

@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, session, redirect, url_fo
 import calendar
 from datetime import date, datetime
 from db import get_db_connection
-from auth_decorators import role_required
+from auth_decorators import role_required, get_months
 
 doctor_bp = Blueprint('doctor', __name__, url_prefix='/doctor')
 
@@ -117,15 +117,15 @@ def doctor_income_summary():
 
     conn.close()
 
-    # ส่งไป template
+    months = get_months()
+
     return render_template(
         'doctor/doctor_income_summary.html',
         year=year,
         month=month,
-        # สรุปยอด
+        months=months,
         sx_sum=sx_sum,
         aes_sum=aes_sum,
-        # ค่าแพทย์
         sx_fee=sx_fee,
         aes_fee=aes_fee,
         # ตาราง SX, AES
