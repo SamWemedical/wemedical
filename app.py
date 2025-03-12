@@ -6660,12 +6660,14 @@ def edit_insurance_config():
           u.user_id, 
           u.first_name, 
           u.last_name,
+          u.nickname,
+          u.start_date,
           COALESCE(c.monthly_deduction, 1000) AS monthly_deduction,
           COALESCE(c.active_deduction, 1) AS active_deduction
         FROM users u
         LEFT JOIN insurance_fund_config c ON u.user_id = c.user_id
         WHERE u.role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
-        ORDER BY u.user_id
+        ORDER BY u.start_date
     """).fetchall()
     conn.close()
 
@@ -7493,171 +7495,79 @@ def insurance_repay_stop_approve():
     conn.close()
     return redirect(url_for('hr_insurance_withdraw_list'))
 
-
-
-
-# แบบฟอร์ม ขอเรียกดูเงินประกันสะสม
-@app.route('/hr/insurance_fund_form', methods=['GET','POST'])
-@role_required('HR','ADMIN')
-def insurance_fund_form():
-    conn = get_db_connection()
-    rows = conn.execute("""
-        SELECT user_id, first_name, last_name, nickname, start_date
-        FROM users
-        WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
-        ORDER BY start_date
-    """).fetchall()
-    conn.close()
-
+# ดูข้อมูล เงินสะสม
+@app.route('/user/insurance_fund_list', methods=['GET', 'POST'])
+@role_required('HR', 'ADMIN')
+def insurance_fund_list():
+    current_year = datetime.now().year
+    current_month = datetime.now().month
     if request.method == 'POST':
-        selected = request.form.get('user_id')  # ได้ค่าเช่น 'ALL' หรือ '5' (string)
-        return redirect(url_for('insurance_fund_list', val=selected))
-        # เราจะส่ง param val=selected ไปยังฟังก์ชัน insurance_fund_list(val)
-
+        selected = request.form.get('user_id')  # 'ALL' หรือ user_id เป็น string
+        month = request.form.get('month', current_month, type=int)
+        year = request.form.get('year', current_year, type=int)
+        return redirect(url_for('insurance_fund_list', val=selected, month=month, year=year))
     else:
-        # GET -> แสดงหน้า HTML ฟอร์ม
-        html = """
-        <h1>ประวัติเงินประกันสะสม</h1>
-        <form method="POST">
-          <p>เลือกพนักงาน:
-            <select name="user_id">
-              <option value="ALL">-- ALL --</option>
-        """
-        for r in rows:
-            uid = r['user_id']
-            name = f"{r['first_name']} {r['last_name']}"
-            html += f'<option value="{uid}">{uid}: {name}</option>'
-        html += """
-            </select>
-          </p>
-          <button type="submit">ดูประวัติเงินประกัน</button>
-        </form>
-        <p><a href="/dashboard">กลับสู่หน้าหลัก</a></p>
-        """
-        return html
-
-@app.route('/hr/insurance_fund_list/<val>')
-@role_required('HR','ADMIN')
-def insurance_fund_list(val):
-    """
-    ถ้า val == 'ALL' => แสดงประกันสะสมของทุก user
-    ถ้า val เป็น user_id => แสดงเฉพาะ user_id นั้น
-    มีการ loop สำหรับคำนวณ total_deduct, total_contrib, total_withdraw, total_repay
-    แล้วสรุปยอด balance
-    """
-    conn = get_db_connection()
-
-    if val == 'ALL':
-        # ดึงทุกคน
-        rows = conn.execute("""
-            SELECT f.*, u.first_name, u.last_name
-            FROM insurance_fund f
-            JOIN users u ON f.user_id=u.user_id
-            ORDER BY f.fund_id DESC
-        """).fetchall()
+        month = request.args.get('month', current_month, type=int)
+        year = request.args.get('year', current_year, type=int)
+        selected = request.args.get('val', None)
+        
+        # กำหนด default ให้ selected หากไม่ได้รับค่า
+        if not selected:
+            if session.get('role') in ['HR', 'ADMIN']:
+                selected = 'ALL'
+            else:
+                selected = session.get('user_id')
+        
+        # For non-HR/ADMIN users, force selected to the logged in user's id.
+        if session.get('role') not in ['HR', 'ADMIN']:
+            selected = session.get('user_id')
+        
+        conn = get_db_connection()
+        if selected == 'ALL':
+            rows = conn.execute("""
+                SELECT f.*, u.first_name, u.last_name, u.nickname,
+                    (f.deducted_amount + f.company_contribute - f.withdraw_amount + f.repay_amount) AS total_balance
+                FROM insurance_fund f
+                JOIN users u ON f.user_id = u.user_id
+                WHERE u.role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
+                ORDER BY f.fund_id DESC
+            """).fetchall()
+        else:
+            user_id = int(selected)
+            rows = conn.execute("""
+                SELECT *
+                FROM insurance_fund
+                WHERE user_id = ?
+                ORDER BY fund_id DESC
+            """, (user_id,)).fetchall()
+        if session.get('role') in ['HR', 'ADMIN']:
+            users_list = conn.execute("""
+                SELECT user_id, first_name, last_name, nickname, start_date
+                FROM users
+                WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
+                ORDER BY start_date
+            """).fetchall()
+        else:
+            users_list = None
         conn.close()
-
-        # ประกาศตัวแปรสะสม
-        total_deduct = 0
-        total_contrib = 0
-        total_withdraw = 0
-        total_repay = 0
-
-        html = "<h1>ประวัติเงินประกันสะสม (ALL)</h1>"
-        html += """
-        <table border='1'>
-          <tr><th>user_id</th><th>ชื่อ</th><th>เดือน</th><th>ปี</th>
-              <th>งวดเงินประกัน</th><th>บริษัทสมทบเพิ่ม</th><th>เบิกเงินสะสม</th><th>คืนเงินเบิกสะสมกลับ</th><th>comment</th></tr>
-        """
-
+        
+        total_deduct = total_contrib = total_withdraw = total_repay = 0
         for r in rows:
-            uid = r['user_id']
-            fname = r['first_name']
-            lname = r['last_name']
-            mm = r['month']
-            yy = r['year']
-            d  = r['deducted_amount']
-            c  = r['company_contribute']
-            w  = r['withdraw_amount']
-            rp = r['repay_amount']
-            cm = r['comment'] or ''
-
-            # สะสมค่า
-            total_deduct += d
-            total_contrib += c
-            total_withdraw += w
-            total_repay += rp
-
-            # สร้างแถวในตาราง
-            html += f"""
-            <tr>
-              <td>{uid}</td>
-              <td>{fname} {lname}</td>
-              <td>{mm}</td>
-              <td>{yy}</td>
-              <td>{d}</td>
-              <td>{c}</td>
-              <td>{w}</td>
-              <td>{rp}</td>
-              <td>{cm}</td>
-            </tr>
-            """
-
-        html += "</table>"
-
-        # คำนวณ Balance รวมของทุกคน
+            total_deduct += r['deducted_amount']
+            total_contrib += r['company_contribute']
+            total_withdraw += r['withdraw_amount']
+            total_repay += r['repay_amount']
         balance = (total_deduct + total_contrib) - total_withdraw + total_repay
-
-        html += f"<p>รวมยอดสะสม (ทุกคน): {balance} บาท</p>"
-        html += """<p><a href="/dashboard">กลับสู่หน้าหลัก</a></p>"""
-        return html
-
-    else:
-        # val เป็น user_id (string) => แปลงเป็น int
-        user_id = int(val)
-
-        rows = conn.execute("""
-            SELECT *
-            FROM insurance_fund
-            WHERE user_id=?
-            ORDER BY fund_id DESC
-        """,(user_id,)).fetchall()
-        conn.close()
-
-        # สะสมค่า
-        total_deduct = 0
-        total_contrib = 0
-        total_withdraw = 0
-        total_repay = 0
-
-        html = f"<h1>ประวัติเงินประกันสะสม (user_id={user_id})</h1>"
-        html += "<table border='1'>"
-        html += "<tr><th>เดือน</th><th>ปี</th><th>งวดเงินประกัน</th><th>บริษัทสมทบเพิ่ม</th><th>เบิกเงินสะสม</th><th>คืนเงินเบิกสะสมกลับ</th><th>comment</th></tr>"
-
-        for r in rows:
-            mm = r['month']
-            yy = r['year']
-            d = r['deducted_amount']
-            c = r['company_contribute']
-            w = r['withdraw_amount']
-            rp= r['repay_amount']
-            cm= r['comment'] or ''
-
-            total_deduct += d
-            total_contrib += c
-            total_withdraw += w
-            total_repay += rp
-
-            html += f"<tr><td>{mm}</td><td>{yy}</td><td>{d}</td><td>{c}</td><td>{w}</td><td>{rp}</td><td>{cm}</td></tr>"
-
-        html += "</table>"
-
-        # คำนวณ Balance เฉพาะพนักงานคนนี้
-        balance = (total_deduct + total_contrib) - total_withdraw + total_repay
-        html += f"<p>รวมยอดสะสม: {balance} บาท</p>"
-
-        html += """<p><a href="/dashboard">กลับสู่หน้าหลัก</a></p>"""
-        return html
+        
+        months = get_months()
+        return render_template("user/insurance_fund_list.html",
+                               rows=rows,
+                               selected=selected,
+                               month=month,
+                               year=year,
+                               months=months,
+                               users_list=users_list,
+                               balance=balance)
 
 
 

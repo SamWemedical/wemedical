@@ -59,7 +59,7 @@
               {% for row in user_rows %}
               <tr>
                 <td>{{ loop.index }}</td>
-                <td>{{ row.first_name }} {{ row.last_name }}</td>
+                <td>{{ row.nickname }} -- {{ row.first_name }} {{ row.last_name }}</td>
                 <td>
                   <!-- ช่องกรอก monthly_deduction -->
                   <input type="number" step="0.01"
