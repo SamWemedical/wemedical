@@ -77,7 +77,7 @@
           {% if users and users|length > 0 %}
             {% for u in users %}
               <tr>
-                <td>{{ u.pr_code or '' }}</td>
+                <td><input type="hidden" name="user_id[]" value="{{ u.user_id }}">{{ u.pr_code or '' }}</td>
                 <td>{{ u.nickname }} -- {{ u.first_name }}</td>
 
                 <!-- แต่ละฟิลด์ ลากให้กว้างได้, พร้อมค่าเดิม -->

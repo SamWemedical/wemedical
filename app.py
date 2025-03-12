@@ -6762,63 +6762,63 @@ def insurance_stop_request():
     start_date_str = row_user['start_date'] or ''
     current_active = row_user['active_deduction'] if row_user['active_deduction'] is not None else 1
 
-    # คำนวณอายุงาน (month) -> year, month
-    from datetime import datetime
+    # คำนวณอายุงาน (เดือน)
     now_dt = datetime.now()
     diff_months = 0
     if start_date_str:
         s_yyyy, s_mm, s_dd = map(int, start_date_str.split('-'))
         start_dt = datetime(s_yyyy, s_mm, s_dd)
         diff_months = (now_dt.year - start_dt.year)*12 + (now_dt.month - start_dt.month)
-        # หากต้องการคำนึงวันที่ด้วย:
-        # if now_dt.day < s_dd:
-        #     diff_months -= 1
     else:
         diff_months = 0
 
     year_of_service = diff_months // 12
     month_of_service= diff_months % 12
 
-    # โหลดยอดสะสมปัจจุบัน (insurance_fund)
+    # โหลดยอดสะสมปัจจุบัน (insurance_fund) โดยคำนวณแยกแต่ละฟิลด์
     row_balance = conn.execute("""
-        SELECT COALESCE(SUM(deducted_amount + company_contribute 
-                            - withdraw_amount + repay_amount), 0) AS balance
+        SELECT 
+            COALESCE(SUM(deducted_amount), 0) AS total_deduct,
+            COALESCE(SUM(company_contribute), 0) AS total_contrib,
+            COALESCE(SUM(withdraw_amount), 0) AS total_withdraw,
+            COALESCE(SUM(repay_amount), 0) AS total_repay,
+            COALESCE(SUM(deducted_amount + company_contribute - withdraw_amount + repay_amount), 0) AS balance
         FROM insurance_fund
         WHERE user_id=?
     """, (user_id,)).fetchone()
-    current_balance = float(row_balance['balance']) if row_balance else 0.0
+    total_deduct   = float(row_balance['total_deduct'])
+    total_contrib  = float(row_balance['total_contrib'])
+    total_withdraw = float(row_balance['total_withdraw'])
+    total_repay    = float(row_balance['total_repay'])
+    current_balance= float(row_balance['balance'])
 
-    # 1) ตรวจสอบว่ามีคำขอ pending อยู่หรือไม่
+    # ตรวจสอบคำขอ pending
     row_pending = conn.execute("""
         SELECT stop_id, request_type
         FROM insurance_stop_request
         WHERE user_id=? AND status='pending'
         LIMIT 1
     """, (user_id,)).fetchone()
-    has_pending_request = (row_pending is not None)  # True if pending
+    has_pending_request = (row_pending is not None)
 
-    # 2) เช็คเงื่อนไข STOP ได้หรือไม่
-    #    => อายุงาน >=8 เดือน + current_balance>=12000
+    # เช็คเงื่อนไข STOP (อายุงาน >= 8 เดือน + current_balance >= 12000)
     can_stop = (diff_months >= 8 and current_balance >= 12000)
 
     if request.method=='POST':
-        # ถ้ามี pending อยู่ => ห้ามส่งใหม่
         if has_pending_request:
             conn.close()
             flash("คุณมีคำขอที่ยังรออนุมัติอยู่ ไม่สามารถส่งคำขอซ้ำได้", "warning")
             return redirect(url_for('insurance_stop_request'))
 
-        req_type = request.form.get('request_type','STOP')  # 'STOP' or 'REACTIVATE'
+        req_type = request.form.get('request_type','STOP')
         reason   = request.form.get('reason','').strip()
 
         if req_type=='STOP':
-            # ถ้าไม่เข้าเงื่อนไข => ป้องกันเรียก POST ตรงๆ
             if not can_stop:
                 conn.close()
                 flash("คุณไม่เข้าเงื่อนไขในการขอหยุดหักเงินสะสม", "danger")
                 return redirect(url_for('insurance_stop_request'))
 
-        # สร้างคำขอ
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         conn.execute("""
             INSERT INTO insurance_stop_request(
@@ -6829,13 +6829,10 @@ def insurance_stop_request():
         conn.commit()
         conn.close()
 
-        # ส่ง Notification หา HR
         add_notification_for_roles(['HR'], f"User {user_id} ขอ {req_type} หักเงินประกันสะสม")
-
         flash("ส่งคำขอเรียบร้อย รอ HR อนุมัติ", "success")
         return redirect(url_for('dashboard'))
     else:
-        # GET => แสดงฟอร์ม
         conn.close()
         return render_template(
             'user/insurance_stop_request.html',
@@ -6844,6 +6841,10 @@ def insurance_stop_request():
             year_of_service=year_of_service,
             month_of_service=month_of_service,
             current_balance=current_balance,
+            total_deduct=total_deduct,
+            total_contrib=total_contrib,
+            total_withdraw=total_withdraw,
+            total_repay=total_repay,
             current_active=current_active,
             has_pending_request=has_pending_request,
             can_stop=can_stop
@@ -10351,6 +10352,22 @@ def incentive_users():
             pharmacy    = parse_float_value(request.form, f'pharmacy_{uid}')
             bonus       = parse_float_value(request.form, f'bonus_{uid}')
             manager     = parse_float_value(request.form, f'manager_{uid}')
+
+            print(f"Updating user {uid}: "
+                f"sx_rate={incentive_sx_rate}, "
+                f"aes_rate={incentive_aes_rate}, "
+                f"afc_rate={incentive_afc_rate}, "
+                f"credit={credit}, "
+                f"translate={translate}, "
+                f"or_aes={or_aes}, "
+                f"extra_travel={extra_travel}, "
+                f"extra_phone={extra_phone}, "
+                f"online_page={online_page}, "
+                f"nurse={nurse}, "
+                f"pharmacy={pharmacy}, "
+                f"bonus={bonus}, "
+                f"manager={manager}")
+
 
             # update ลงตาราง users
             conn.execute("""
