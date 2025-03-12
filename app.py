@@ -10335,10 +10335,8 @@ def incentive_users():
     """
     conn = get_db_connection()
     if request.method == 'POST':
-        # อ่าน user_id[] ทั้งหมด
         user_ids = request.form.getlist('user_id[]')
         for uid in user_ids:
-            # parse value จากฟอร์ม
             incentive_sx_rate  = parse_float_value(request.form, f'incentive_sx_rate_{uid}')
             incentive_aes_rate = parse_float_value(request.form, f'incentive_aes_rate_{uid}')
             incentive_afc_rate = parse_float_value(request.form, f'incentive_afc_rate_{uid}')
@@ -10353,23 +10351,6 @@ def incentive_users():
             bonus       = parse_float_value(request.form, f'bonus_{uid}')
             manager     = parse_float_value(request.form, f'manager_{uid}')
 
-            print(f"Updating user {uid}: "
-                f"sx_rate={incentive_sx_rate}, "
-                f"aes_rate={incentive_aes_rate}, "
-                f"afc_rate={incentive_afc_rate}, "
-                f"credit={credit}, "
-                f"translate={translate}, "
-                f"or_aes={or_aes}, "
-                f"extra_travel={extra_travel}, "
-                f"extra_phone={extra_phone}, "
-                f"online_page={online_page}, "
-                f"nurse={nurse}, "
-                f"pharmacy={pharmacy}, "
-                f"bonus={bonus}, "
-                f"manager={manager}")
-
-
-            # update ลงตาราง users
             conn.execute("""
                 UPDATE users
                 SET 
@@ -10395,7 +10376,6 @@ def incentive_users():
         flash("Updated incentives for all users successfully!", "success")
         return redirect(url_for('incentive_users'))
     else:
-        # GET => select user list
         rows_users = conn.execute("""
             SELECT
               user_id,

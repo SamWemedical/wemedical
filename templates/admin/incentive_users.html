@@ -114,12 +114,12 @@
                 <!-- เปลี่ยนเป็น extra_travel, extra_phone ตามโจทย์ -->
                 <td>
                   <input type="number" step="0.01" class="form-control"
-                         name="travel_{{ u.user_id }}"
+                         name="extra_travel_{{ u.user_id }}"
                          value="{{ '{:.0f}'.format(u.extra_travel or 0.0) }}">
                 </td>
                 <td>
                   <input type="number" step="0.01" class="form-control"
-                         name="phone_{{ u.user_id }}"
+                         name="extra_phone_{{ u.user_id }}"
                          value="{{ '{:.0f}'.format(u.extra_phone or 0.0) }}">
                 </td>
                 <td>
