@@ -64,18 +64,19 @@
 
       <!-- รายการเมนู -->
       <ul class="list-group mb-3">
-        <!-- หมวดหมู่: จัดการลูกค้า -->
-        <li class="list-group-item card-top text-white fw-bold">จัดการลูกค้า</li>
-        <li class="list-group-item"><a href="/customer_database_th">ลงทะเบียนคนไข้ (ภาษาไทย)</a></li>
+        <!-- หมวดหมู่: จัดการคนไข้ -->
+        <li class="list-group-item card-top text-white fw-bold">จัดการคนไข้</li>
+        <li class="list-group-item"><a href="/customer_database_th">ลงทะเบียน (ภาษาไทย)</a></li>
         <li class="list-group-item"><a href="/customer_database_en">Registration (English Form)</a></li>
         <li class="list-group-item"><a href="/customer_database_indo">Pendaftaran (Bahasa Indonesia)</a></li>
         <li class="list-group-item"><a href="/customer_list">ดูรายชื่อคนไข้</a></li>
 
         <!-- หมวดหมู่: บัญชี -->
-        <li class="list-group-item card-top text-white fw-bold">บัญชี</li>
-        <li class="list-group-item"><a href="/daily_income">บัญชีรายรับรายวัน</a></li>
-        <li class="list-group-item"><a href="/procedures">รายชื่อหัตถการ</a></li>
-        </li>
+        {% if session.get('sub_category_id')|int in [14] %}
+          <li class="list-group-item card-top text-white fw-bold">บัญชี</li>
+          <li class="list-group-item"><a href="/daily_income">บัญชีรายรับรายวัน</a></li>
+          <li class="list-group-item"><a href="/procedures">รายชื่อหัตถการ</a></li>
+        {% endif %}
 
         <!-- หมวดหมู่: ตารางนัด -->
         <li class="list-group-item card-top text-white fw-bold">ตารางนัด</li>

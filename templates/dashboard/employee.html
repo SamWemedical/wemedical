@@ -83,14 +83,16 @@
         <!-- หมวดหมู่: เงินเดือน และ สวัสดิการ -->
         <li class="list-group-item card-top text-black fw-bold">เงินเดือน และ สวัสดิการ</li>
         <li class="list-group-item"><a href="/payroll_summary" class="btn btn-salary text-white">เงินเดือน</a></li>
-        <li class="list-group-item"><a href="/pr_income_summary" class="btn btn-salary text-white">ยอดขาย</a></li>
+        {% if session.get('sub_category_id')|int in [9] %}
+          <li class="list-group-item"><a href="/pr_income_summary" class="btn btn-salary text-white">ยอดขายส่วนตัว</a></li>
+        {% endif %}
         <li class="list-group-item"><a href="/ot_summary" class="btn btn-salary text-white">สรุปการเข้า-ออกงาน</a></li>
-        
-
-        <!-- หมวดหมู่: ค่าตอบแทนอื่นๆ -->
-        <li class="list-group-item card-top text-black fw-bold">ค่าตอบแทนอื่นๆ</li>
-        <li class="list-group-item"><a href="/translate_commission" class="btn btn-salary text-white">(PA) บันทึก แปลบทความ</a></li>
-        <li class="list-group-item"><a href="/aes_commission" class="btn btn-salary text-white">(OR) บันทึกค่ามือ AES รายวัน</a></li>
+        {% if session.get('sub_category_id')|int in [9] %}
+          <li class="list-group-item"><a href="/translate_commission" class="btn btn-salary text-white">(PA) บันทึก แปลบทความ</a></li>
+        {% endif %}
+        {% if session.get('sub_category_id')|int in [10] %}
+          <li class="list-group-item"><a href="/aes_commission" class="btn btn-salary text-white">(OR) บันทึกค่ามือ AES รายวัน</a></li>
+        {% endif %}
 
         <!-- หมวดหมู่: ส่วนตัว -->
         <li class="list-group-item card-top text-black fw-bold">ส่วนตัว</li>

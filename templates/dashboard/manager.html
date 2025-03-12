@@ -81,7 +81,9 @@
         <li class="list-group-item"><a href="/check_in_out" class="btn btn-user text-white">บันทึกเวลาเข้า-ออกงาน</a></li>
         <li class="list-group-item"><a href="/leave_request" class="btn btn-user text-white">ยื่นใบลา</a></li>
         <li class="list-group-item"><a href="/payroll_summary" class="btn btn-user text-white">เงินเดือน</a></li>
-        <li class="list-group-item"><a href="/pr_income_summary" class="btn btn-user text-white">ยอดขาย</a></li>
+        {% if session.get('sub_category_id')|int in [4, 5] %}
+          <li class="list-group-item"><a href="/pr_income_summary" class="btn btn-user text-white">ยอดขายส่วนตัว</a></li>
+        {% endif %}
         <li class="list-group-item"><a href="/ot_summary" class="btn btn-user text-white">สรุปการเข้า-ออกงาน</a></li>
         
         <!-- หมวดหมู่: จัดการพนักงาน -->
@@ -90,8 +92,10 @@
         <li class="list-group-item"><a href="/leave_approval_list" class="btn btn-manage text-white">อนุมัติ คำขอลางาน</a></li>
         <li class="list-group-item"><a href="/hr/ot_summary_step1" class="btn btn-manage text-white">สรุปการเข้า-ออกงาน (พนักงาน)</a></li>
         <li class="list-group-item"><a href="/user/user_list" class="btn btn-manage text-white">ฐานข้อมูล (พนักงาน)</a></li>
-        <li class="list-group-item"><a href="/aes_commission" class="btn btn-manage text-white">บันทึก/แก้ไข ค่ามือ AES รายวัน</a></li>
-        <li class="list-group-item"><a href="/aes_commission_rate" class="btn btn-manage text-white">ตั้งเรทค่ามือ AES</a></li>
+        {% if session.get('sub_category_id')|int in [5] %}
+          <li class="list-group-item"><a href="/aes_commission" class="btn btn-manage text-white">บันทึก/แก้ไข ค่ามือ AES รายวัน</a></li>
+          <li class="list-group-item"><a href="/aes_commission_rate" class="btn btn-manage text-white">ตั้งเรทค่ามือ AES</a></li>
+        {% endif %}
 
         <!-- หมวดหมู่: ส่วนตัว -->
         <li class="list-group-item card-top text-black fw-bold">ส่วนตัว</li>

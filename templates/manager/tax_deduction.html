@@ -31,18 +31,18 @@
       <form method="POST">
         <div class="row g-3 mb-3">
           <div class="col-md-6">
-            <label for="year" class="form-label">ปี:</label>
-            <select id="year" name="year" class="form-select">
-              {% for y in range(current_year - 2, current_year + 2) %}
-              <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+            <label for="month" class="form-label">เดือน:</label>
+            <select id="month" name="month" class="form-select">
+              {% for m in months %}
+                <option value="{{ m.value }}" {% if m.value == current_month %}selected{% endif %}>{{ m.name }}</option>
               {% endfor %}
             </select>
           </div>
           <div class="col-md-6">
-            <label for="month" class="form-label">เดือน:</label>
-            <select id="month" name="month" class="form-select">
-              {% for m in range(1, 13) %}
-              <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>{{ m }}</option>
+            <label for="year" class="form-label">ปี:</label>
+            <select id="year" name="year" class="form-select">
+              {% for y in range(current_year - 2, current_year + 2) %}
+              <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
               {% endfor %}
             </select>
           </div>
@@ -74,7 +74,8 @@
 
         <button type="submit" class="btn btn-success mt-3">บันทึกทั้งหมด</button>
       </form>
-
+      <hr>
+      <a href="/manager/tax_deduction_history" class="btn btn-primary mt-3">ดูภาษีย้อนหลัง 12เดือน</a>
       <a href="/dashboard" class="btn btn-secondary mt-3">กลับสู่หน้าหลัก</a>
     </div>
   </div>

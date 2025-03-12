@@ -6351,8 +6351,6 @@ def loan_deduction_history():
 @role_required('SECRETARY')
 @subcategory_required('tax_deduction')
 def tax_deduction():
-    from datetime import datetime
-
     if request.method == 'POST':
         year = int(request.form.get('year'))
         month = int(request.form.get('month'))
@@ -6388,11 +6386,18 @@ def tax_deduction():
             FROM users u
             LEFT JOIN tax_deduction_records td
             ON u.user_id = td.user_id AND td.year = ? AND td.month = ?
+            WHERE role in ('HR', 'EMPLOYEE', 'MANAGER', 'SECRETARY')
             ORDER BY u.user_id
         """, (current_year, current_month)).fetchall()
         conn.close()
 
-        return render_template('manager/tax_deduction.html', users=users, current_year=current_year, current_month=current_month)
+        months = get_months()
+
+        return render_template('manager/tax_deduction.html', 
+                               users=users, 
+                               months=months,
+                               current_year=current_year, 
+                               current_month=current_month)
 
 # หัก ภาษี ณ ที่จ่าย (ประวัติย้อนหลัง 12 เดือน)
 @app.route('/manager/tax_deduction_history', methods=['GET'])
