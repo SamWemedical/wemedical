@@ -4331,6 +4331,7 @@ def ot_summary():
 ### -------------------------------------------
 ### OT Approval
 ### -------------------------------------------
+# ดึงข้อมูล OT approval list ตาม subcat access
 @app.route('/ot_approval_list')
 @role_required('HR', 'MANAGER')
 @subcategory_required("ot_approval_list")
@@ -4339,68 +4340,48 @@ def ot_approval_list():
     current_subcat = session.get('sub_category_id')
     conn = get_db_connection()
     
-    # สำหรับ HR: ให้แสดงรายการ OT ทั้งหมด
-    if current_role == 'HR':
-        query = """
-            SELECT a.attendance_id, a.user_id, a.checkin_time, a.checkout_time, a.work_date,
-                   a.ot_status, a.ot_reason, a.ot_approve_comment,
-                   u.first_name, u.last_name, u.nickname
-            FROM attendance a
-            JOIN users u ON a.user_id = u.user_id
-            WHERE a.ot_status IN ('pending', 'pending_final', 'approved', 'rejected')
-            ORDER BY a.attendance_id DESC
-        """
-        params = []
-    elif current_role.startswith("MANAGER"):
-        # สำหรับ Manager: แยกตาม Manager (child) และ Manager (General)
-        if str(current_subcat) == "3":
-            # Manager (General): แสดงเฉพาะรายการที่ status เป็น pending_final
-            query = """
-                SELECT a.attendance_id, a.user_id, a.checkin_time, a.checkout_time, a.work_date,
-                       a.ot_status, a.ot_reason, a.ot_approve_comment,
-                       u.first_name, u.last_name, u.nickname
-                FROM attendance a
-                JOIN users u ON a.user_id = u.user_id
-                WHERE a.ot_status = 'pending_final'
-                ORDER BY a.attendance_id DESC
-            """
-            params = []
-        else:
-            # Manager (child): ดึงเฉพาะรายการที่เกี่ยวข้องกับ employee ที่อยู่ใน subcategories ที่ Manager (child) มีสิทธิ์ดู
-            allowed_employee_subcats = get_allowed_employee_subcategories(current_subcat)
-            if not allowed_employee_subcats:
-                conn.close()
-                return render_template("ot_approval/ot_approval_list.html", ot_rows=[])
-            placeholders = ",".join("?" for _ in allowed_employee_subcats)
-            query = f"""
-                SELECT a.attendance_id, a.user_id, a.checkin_time, a.checkout_time, a.work_date,
-                       a.ot_status, a.ot_reason, a.ot_approve_comment,
-                       u.first_name, u.last_name, u.nickname
-                FROM attendance a
-                JOIN users u ON a.user_id = u.user_id
-                WHERE a.ot_status = 'pending' 
-                  AND u.sub_category_id IN ({placeholders})
-                ORDER BY a.attendance_id DESC
-            """
-            params = tuple(allowed_employee_subcats)
-    else:
-        # สำหรับผู้ใช้งานอื่น ๆ (ถ้ามี)
-        query = """
+    # เงื่อนไขสำหรับ HR และ Manager (child) โดยดูจาก current_subcat ใน (2, 4, 5, 6, 7)
+    if current_subcat in (2, 4, 5, 6, 7):
+        allowed_employee_subcats = get_allowed_employee_subcategories(current_subcat)
+        if not allowed_employee_subcats:
+            conn.close()
+            return render_template("ot_approval/ot_approval_list.html", ot_rows=[])
+        placeholders = ",".join("?" for _ in allowed_employee_subcats)
+        query = f"""
             SELECT a.attendance_id, a.user_id, a.checkin_time, a.checkout_time, a.work_date,
                    a.ot_status, a.ot_reason, a.ot_approve_comment,
                    u.first_name, u.last_name, u.nickname
             FROM attendance a
             JOIN users u ON a.user_id = u.user_id
             WHERE a.ot_status = 'pending'
+              AND u.sub_category_id IN ({placeholders})
+            ORDER BY a.attendance_id DESC
+        """
+        params = tuple(allowed_employee_subcats)
+    elif current_subcat == 3:
+        # สำหรับ Manager (General)
+        query = """
+            SELECT a.attendance_id, a.user_id, a.checkin_time, a.checkout_time, a.work_date,
+                   a.ot_status, a.ot_reason, a.ot_approve_comment,
+                   u.first_name, u.last_name, u.nickname
+            FROM attendance a
+            JOIN users u ON a.user_id = u.user_id
+            WHERE a.ot_status = 'pending_final'
             ORDER BY a.attendance_id DESC
         """
         params = []
+    else:
+        flash("ไม่อนุญาตให้ดำเนินการ", "warning")
+        return redirect(url_for('ot_approval_list'))
     
     rows = conn.execute(query, params).fetchall()
     conn.close()
     
-    return render_template("ot_approval/ot_approval_list.html", ot_rows=rows, current_role=current_role)
+    return render_template("ot_approval/ot_approval_list.html", 
+                           ot_rows=rows,
+                           current_role=current_role)
 
+# อนุมัติ OT approve
 @app.route('/ot_approve', methods=['POST'])
 @role_required('HR', 'MANAGER')
 @subcategory_required("ot_approve")
@@ -4417,95 +4398,82 @@ def ot_approve():
     try:
         # ดึงข้อมูล OT request พร้อมข้อมูลพนักงาน
         row = conn.execute("""
-            SELECT a.attendance_id, a.user_id, a.ot_status, u.sub_category_id
+            SELECT a.attendance_id, a.user_id, a.ot_status, a.ot_approve_comment, u.sub_category_id
             FROM attendance a
             JOIN users u ON a.user_id = u.user_id
             WHERE a.attendance_id = ?
         """, (att_id,)).fetchone()
         if not row:
-            conn.close()
             flash("ไม่พบ OT request", "warning")
             return redirect(url_for('ot_approval_list'))
         
         employee_subcat = row['sub_category_id']
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # สำหรับ HR ไม่อนุมัติ OT โดยตรง
-        if current_role == 'HR':
-            conn.close()
-            flash("HR ไม่สามารถอนุมัติ OT ได้", "warning")
-            return redirect(url_for('ot_approval_list'))
-        
-        if current_role.startswith("MANAGER"):
-            # สำหรับ Manager (child): current_subcat != "3"
-            if current_subcat is not None and str(current_subcat) != "3":
-                if action == 'approve':
-                    # ดึง final approver (Manager General) จาก employee_subcat
-                    final_manager_id = get_parent_manager_for_employee(employee_subcat)
-                    if final_manager_id is None:
-                        conn.close()
-                        flash("ไม่พบ Manager (General) สำหรับ OT นี้", "warning")
-                        return redirect(url_for('ot_approval_list'))
-                    new_status = 'pending_final'
-                    conn.execute("""
-                        UPDATE attendance
-                        SET ot_status = ?,
-                            ot_approve_comment = ?,
-                            first_approver_id = ?,
-                            final_approver_id = ?,
-                            updated_at = ?
-                        WHERE attendance_id = ?
-                    """, (new_status, comment, current_manager_id, final_manager_id, now_str, att_id))
-                elif action == 'reject':
-                    new_status = 'rejected'
-                    conn.execute("""
-                        UPDATE attendance
-                        SET ot_status = ?,
-                            ot_approve_comment = ?,
-                            ot_before_midnight = 0,
-                            ot_after_midnight = 0,
-                            updated_at = ?
-                        WHERE attendance_id = ?
-                    """, (new_status, comment, now_str, att_id))
-                else:
-                    flash("ไม่รู้จัก action สำหรับ Manager (child)", "danger")
-                    conn.close()
+        if current_subcat in (2, 4, 5, 6, 7):
+            if action == 'approve':
+                final_manager_id = get_parent_manager_for_employee(employee_subcat)
+                if final_manager_id is None:
+                    flash("ไม่พบ Manager (General) สำหรับ OT นี้", "warning")
                     return redirect(url_for('ot_approval_list'))
+                new_status = 'pending_final'
+                conn.execute("""
+                    UPDATE attendance
+                    SET ot_status = ?,
+                        ot_approve_comment = ?,
+                        first_approver_id = ?,
+                        final_approver_id = ?,
+                        updated_at = ?
+                    WHERE attendance_id = ?
+                """, (new_status, comment, current_manager_id, final_manager_id, now_str, att_id))
+            elif action == 'reject':
+                new_status = 'rejected'
+                conn.execute("""
+                    UPDATE attendance
+                    SET ot_status = ?,
+                        ot_approve_comment = ?,
+                        ot_before_midnight = 0,
+                        ot_after_midnight = 0,
+                        updated_at = ?
+                    WHERE attendance_id = ?
+                """, (new_status, comment, now_str, att_id))
             else:
-                # สำหรับ Manager (General): current_subcat == "3"
-                if (old_status := row['ot_status']) != 'pending_final':
-                    flash("ใบ OT นี้ยังไม่ถึงขั้นตอนตัดสินใจขั้นสุดท้าย", "warning")
-                    conn.close()
-                    return redirect(url_for('ot_approval_list'))
-                if action in ['approve']:
-                    new_status = 'approved'
-                    conn.execute("""
-                        UPDATE attendance
-                        SET ot_status = ?,
-                            ot_approve_comment = ?,
-                            updated_at = ?
-                        WHERE attendance_id = ?
-                    """, (new_status, comment, now_str, att_id))
-                elif action == 'reject':
-                    new_status = 'rejected'
-                    conn.execute("""
-                        UPDATE attendance
-                        SET ot_status = ?,
-                            ot_approve_comment = ?,
-                            ot_before_midnight = 0,
-                            ot_after_midnight = 0,
-                            updated_at = ?
-                        WHERE attendance_id = ?
-                    """, (new_status, comment, now_str, att_id))
-                else:
-                    flash("ไม่รู้จัก action สำหรับ Manager (General)", "danger")
-                    conn.close()
-                    return redirect(url_for('ot_approval_list'))
+                flash("ไม่รู้จัก action สำหรับ Manager (child)", "danger")
+                return redirect(url_for('ot_approval_list'))
+        elif current_subcat == 3:
+            old_status = row['ot_status']
+            if old_status != 'pending_final':
+                flash("ใบ OT นี้ยังไม่ถึงขั้นตอนตัดสินใจขั้นสุดท้าย", "warning")
+                return redirect(url_for('ot_approval_list'))
+            # ถ้า comment ที่ส่งมาจากฟอร์มเป็นค่าว่าง (หรือแค่ whitespace) ให้ใช้ค่า comment เดิมจากฐานข้อมูล
+            if not comment.strip():
+                comment = row.get('ot_approve_comment', '')
+            if action == 'approve':
+                new_status = 'approved'
+                conn.execute("""
+                    UPDATE attendance
+                    SET ot_status = ?,
+                        ot_approve_comment = ?,
+                        updated_at = ?
+                    WHERE attendance_id = ?
+                """, (new_status, comment, now_str, att_id))
+            elif action == 'reject':
+                new_status = 'rejected'
+                conn.execute("""
+                    UPDATE attendance
+                    SET ot_status = ?,
+                        ot_approve_comment = ?,
+                        ot_before_midnight = 0,
+                        ot_after_midnight = 0,
+                        updated_at = ?
+                    WHERE attendance_id = ?
+                """, (new_status, comment, now_str, att_id))
+            else:
+                flash("ไม่รู้จัก action สำหรับ Manager (General)", "danger")
+                return redirect(url_for('ot_approval_list'))
         else:
-            conn.close()
             flash("ไม่อนุญาตให้ดำเนินการ", "warning")
             return redirect(url_for('ot_approval_list'))
-        
         conn.commit()
         flash("ดำเนินการ OT request เรียบร้อย", "success")
     except Exception as e:
@@ -4514,6 +4482,28 @@ def ot_approve():
     finally:
         conn.close()
     return redirect(url_for('ot_approval_list'))
+
+# HR ดู OT history ที่มีสถานะ 'approved', 'rejected' แล้ว
+@app.route('/ot_history', methods=['GET'])
+@role_required('HR')
+def ot_history():
+    """
+    ให้ HR เรียกดู OT request ที่มีสถานะ approved หรือ rejected
+    """
+    conn = get_db_connection()
+    query = """
+        SELECT a.attendance_id, a.user_id, a.checkin_time, a.checkout_time, a.work_date,
+               a.ot_status, a.ot_reason, a.ot_approve_comment,
+               u.first_name, u.last_name, u.nickname
+        FROM attendance a
+        JOIN users u ON a.user_id = u.user_id
+        WHERE a.ot_status IN ('approved', 'rejected')
+        ORDER BY a.attendance_id DESC
+    """
+    rows = conn.execute(query).fetchall()
+    conn.close()
+    
+    return render_template("ot_approval/ot_history.html", ot_history=rows)
 
 
 
@@ -9011,7 +9001,7 @@ def procedures():
     # กำหนด valid subsets สำหรับ procedure_name สำหรับแต่ละ category
     valid_procedures = {
         "SX": ["จมูก(ปิด)", "จมูก(โอเพ่น)", "คาง", "เหนียง", "ปาก", "Fat Graft", "ตา คิ้ว", "ดึงหน้า", "หน้าอก"],
-        "AES": ["แพ็คเกจรวม", "Botox", "Filler", "Fat", "ร้อยไหม", "ดริปวิตามิน", "งานผิว"],
+        "AES": ["แพ็คเกจรวม", "Botox", "Filler", "Fat", "ร้อยไหม", "ดริปวิตามิน", "งานผิว", "Voucher"],
         "AFC": ["Set AFC", "ยาทารอย", "Anita", "น้ำลดบวม", "น้ำยาบ้วนปาก", "ยาหยอด", "Cool Pack"],
         "ค่ายาและบริการ": ["ค่ายา", "ค่าโรงพยาบาล", "ตรวจแลป", "จ้างพยาบาล/ผู้ช่วย", "ทำแผล ตัดไหม"],
         "อื่นๆ": ["ปากกาลดน้ำหนัก", "ล้างเล็บ", "อื่นๆ"]
@@ -9070,7 +9060,7 @@ def edit_procedure(procedure_id):
     # กำหนด valid subsets สำหรับ procedure_name สำหรับแต่ละ category
     valid_procedures = {
         "SX": ["จมูก(ปิด)", "จมูก(โอเพ่น)", "คาง", "เหนียง", "ปาก", "Fat Graft", "ตา คิ้ว", "ดึงหน้า", "หน้าอก"],
-        "AES": ["แพ็คเกจรวม", "Botox", "Filler", "Fat", "ร้อยไหม", "ดริปวิตามิน", "งานผิว"],
+        "AES": ["แพ็คเกจรวม", "Botox", "Filler", "Fat", "ร้อยไหม", "ดริปวิตามิน", "งานผิว", "Voucher"],
         "AFC": ["Set AFC", "ยาทารอย", "Anita", "น้ำลดบวม", "น้ำยาบ้วนปาก", "ยาหยอด", "Cool Pack"],
         "ค่ายาและบริการ": ["ค่ายา", "ค่าโรงพยาบาล", "ตรวจแลป", "จ้างพยาบาล/ผู้ช่วย", "ทำแผล ตัดไหม"],
         "อื่นๆ": ["ปากกาลดน้ำหนัก", "ล้างเล็บ", "อื่นๆ"]
@@ -9680,7 +9670,7 @@ def pr_income_summary():
         ],
         "AES": [
             "แพ็คเกจรวม", "Botox", "Filler", "Fat", "ร้อยไหม",
-            "ดริปวิตามิน", "งานผิว"
+            "ดริปวิตามิน", "งานผิว", "Voucher"
         ],
         "AFC": [
             "Set AFC", "ยาทารอย", "Anita", "น้ำลดบวม", "น้ำยาบ้วนปาก", "ยาหยอด", "Cool Pack"
@@ -9835,7 +9825,7 @@ def commission_settings():
         ],
         "AES": [
             "แพ็คเกจรวม", "Botox", "Filler", "Fat", "ร้อยไหม",
-            "ดริปวิตามิน", "งานผิว"
+            "ดริปวิตามิน", "งานผิว", "Voucher"
         ],
         "AFC": [
             "Set AFC", "ยาทารอย", "Anita", "น้ำลดบวม", "น้ำยาบ้วนปาก", "ยาหยอด", "Cool Pack"
@@ -9939,7 +9929,7 @@ def commission_users():
         ],
         "AES": [
             "แพ็คเกจรวม", "Botox", "Filler", "Fat", "ร้อยไหม",
-            "ดริปวิตามิน", "งานผิว"
+            "ดริปวิตามิน", "งานผิว", "Voucher"
         ],
         "AFC": [
             "Set AFC", "ยาทารอย", "Anita", "น้ำลดบวม", "น้ำยาบ้วนปาก", "ยาหยอด", "Cool Pack"

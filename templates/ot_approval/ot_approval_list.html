@@ -10,10 +10,7 @@
   <style>
     body { background-color: #f9f9f9; }
     .container { max-width: 900px; margin: 40px auto; }
-    .card-header {
-      background-color: #fd7e14; /* สีส้ม */
-      color: #fff;
-    }
+    .card-header { background-color: #fd7e14; color: #fff; }
   </style>
 </head>
 <body>
@@ -34,7 +31,7 @@
           <table class="table table-bordered align-middle">
             <thead class="table-light">
               <tr>
-                <!-- ไม่โชว์ attendance_id และ user_id -->
+                <th>#</th>
                 <th>ชื่อ</th>
                 <th>วัน-เวลาเลิกงาน</th>
                 <th>เหตุผล</th>
@@ -46,27 +43,23 @@
             <tbody>
             {% for r in ot_rows %}
               <tr>
-                <!-- แสดงชื่อจริง นามสกุล -->
+                <td>{{ loop.index }}</td>
                 <td>{{ r.nickname }} -- {{ r.first_name }}</td>
                 <td>{{ r.checkout_time }}</td>
                 <td>{{ r.ot_reason or '' }}</td>
                 <td>{{ r.ot_approve_comment or '' }}</td>
                 <td>{{ r.ot_status}}</td>
                 <td>
-                  <!-- ฟอร์ม POST ไป /ot_approve -->
                   <form method="POST" action="{{ url_for('ot_approve') }}">
-                    <!-- ซ่อน attendance_id ไว้ (key) -->
                     <input type="hidden" name="attendance_id" value="{{ r.attendance_id }}">
-                    
-                    <!-- ช่องให้ HR/Manager ใส่ความเห็น -->
+
                     <div class="mb-2">
                       <input type="text" class="form-control form-control-sm" name="comment" placeholder="ความเห็น..." />
                     </div>
-                    
-                    <!-- ปุ่ม อนุมัติ/ปฏิเสธ -->
+
                     <div class="btn-group" role="group">
-                      <button class="btn btn-success btn-sm" name="action" value="approve" {% if current_role == 'HR' %}disabled{% endif %}>อนุมัติ</button>
-                      <button class="btn btn-danger btn-sm" name="action" value="reject" {% if current_role == 'HR' %}disabled{% endif %}>ปฏิเสธ</button>
+                      <button class="btn btn-success btn-sm" name="action" value="approve">อนุมัติ</button>
+                      <button class="btn btn-danger btn-sm" name="action" value="reject">ปฏิเสธ</button>
                     </div>
                   </form>
                 </td>
@@ -78,12 +71,15 @@
       {% endif %}
 
       <div class="text-end mt-3">
+        {% if session.get('sub_category_id')|int in [2] %}
+          <a href="/ot_history" class="btn btn-primary text-white">ดูคำขอ OT ที่อนุมัติ / ปฏิเสธไปแล้ว</a>
+        {% endif %}
         <a href="/dashboard" class="btn btn-secondary">กลับสู่หน้าหลัก</a>
       </div>
 
-    </div><!-- card-body -->
-  </div><!-- card -->
-</div><!-- container -->
+    </div>
+  </div>
+</div>
 
 <!-- Bootstrap 5 JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
