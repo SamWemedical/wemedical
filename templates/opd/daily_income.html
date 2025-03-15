@@ -262,6 +262,7 @@
         <option value="AES">AES</option>
         <option value="AFC">AFC</option>
         <option value="ค่ายาและบริการ">ค่ายาและบริการ</option>
+        <option value="มัดจำ">มัดจำ</option>
         <option value="อื่นๆ">อื่นๆ</option>
       </select>
     </div>
@@ -301,23 +302,11 @@
       <input type="number" class="form-control procedure-price" name="procedure_price" readonly>
     </div>
 
-    <!-- Reminder Inputs -->
-    <div class="row mb-3">
-      <div class="col">
-        <label class="form-label">นัดตัดไหม (วัน)</label>
-        <input type="number" class="form-control reminder-stitchoff" name="reminder_stitchoff" placeholder="จำนวนวัน">
-      </div>
-      <div class="col">
-        <label class="form-label">นัดติดตามผล (วัน)</label>
-        <input type="number" class="form-control reminder-followup" name="reminder_followup" placeholder="จำนวนวัน">
-      </div>
-    </div>
-
     <!-- PR Section -->
-    <h5>การกระจาย PR</h5>
+    <h5>ลงรหัส PR</h5>
     <div class="row mb-3">
       <div class="col">
-        <label class="form-label">PR Code #1</label>
+        <label class="form-label">PR #1</label>
         <select class="form-select pr-code1" name="pr_code1" required>
           <option value="">เลือก PR</option>
           {% for user in users %}
@@ -335,7 +324,7 @@
     </div>
     <div class="row mb-3">
       <div class="col">
-        <label class="form-label">PR Code #2</label>
+        <label class="form-label">PR #2</label>
         <select class="form-select pr-code2" name="pr_code2">
           <option value="">เลือก PR</option>
           {% for user in users %}
@@ -353,7 +342,7 @@
     </div>
     <div class="row mb-3">
       <div class="col">
-        <label class="form-label">PR Code #3</label>
+        <label class="form-label">PR #3</label>
         <select class="form-select pr-code3" name="pr_code3">
           <option value="">เลือก PR</option>
           {% for user in users %}
@@ -422,6 +411,7 @@
     "AES": ["แพ็คเกจรวม", "Botox", "Filler", "Fat", "ร้อยไหม", "ดริปวิตามิน", "งานผิว", "Voucher"],
     "AFC": ["Set AFC", "ยาทารอย", "Anita", "น้ำลดบวม", "น้ำยาบ้วนปาก", "ยาหยอด", "Cool Pack"],
     "ค่ายาและบริการ": ["ค่ายา", "ค่าโรงพยาบาล", "ตรวจแลป", "จ้างพยาบาล/ผู้ช่วย", "ทำแผล ตัดไหม"],
+    "มัดจำ": ["มัดจำ SX", "มัดจำ AES"],
     "อื่นๆ": ["ปากกาลดน้ำหนัก", "ล้างเล็บ", "อื่นๆ"]
   };
 

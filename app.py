@@ -702,6 +702,9 @@ def initialize_default_workflow_configurations():
         "aes_commission_assignment": {"require_subcategory": 1, "allowed_subcategory_ids": "1,5,10", "description": "เฉพาะ แผนก OR"},
         "pr_income_summary": {"require_subcategory": 1, "allowed_subcategory_ids": "4,5,9,16", "description": "เฉพาะ PR"},
         "translate_commission": {"require_subcategory": 1, "allowed_subcategory_ids": "1,2,9", "description": "เฉพาะ PA INDO"},
+        "monthly_sales_my_details": {"require_subcategory": 1, "allowed_subcategory_ids": "11", "description": "เฉพาะ Admin Online"},
+        "monthly_sales_my_details_full": {"require_subcategory": 1, "allowed_subcategory_ids": "11", "description": "เฉพาะ Admin Online"},
+        
 
 
 
@@ -4151,8 +4154,10 @@ def check_in_out():
                 current_subcat = session.get('sub_category_id')
                 
                 if ot_reason:
-                    if user_role == 'HR' or (user_role.startswith("MANAGER") and str(current_subcat) != "3"):
+                    if current_subcat in (2, 4, 5, 6, 7):
                         ot_status = 'pending_final'
+                    elif current_subcat in (3, 16):
+                        ot_status = 'approved'
                     else:
                         ot_status = 'pending'
                 else:
@@ -4389,8 +4394,7 @@ def ot_approve():
     att_id = request.form.get('attendance_id')
     action = request.form.get('action') 
     comment = request.form.get('comment', '')
-    
-    current_role = session.get('role')
+
     current_subcat = session.get('sub_category_id')
     current_manager_id = session.get('user_id')
     
@@ -4407,36 +4411,35 @@ def ot_approve():
             flash("ไม่พบ OT request", "warning")
             return redirect(url_for('ot_approval_list'))
         
-        employee_subcat = row['sub_category_id']
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         if current_subcat in (2, 4, 5, 6, 7):
+            old_status = row['ot_status']
+            if old_status != 'pending':
+                flash("ใบ OT นี้ยังไม่ถึงขั้นตอนการอนุมัติ", "warning")
+                return redirect(url_for('ot_approval_list'))
             if action == 'approve':
-                final_manager_id = get_parent_manager_for_employee(employee_subcat)
-                if final_manager_id is None:
-                    flash("ไม่พบ Manager (General) สำหรับ OT นี้", "warning")
-                    return redirect(url_for('ot_approval_list'))
                 new_status = 'pending_final'
                 conn.execute("""
                     UPDATE attendance
                     SET ot_status = ?,
                         ot_approve_comment = ?,
                         first_approver_id = ?,
-                        final_approver_id = ?,
                         updated_at = ?
                     WHERE attendance_id = ?
-                """, (new_status, comment, current_manager_id, final_manager_id, now_str, att_id))
+                """, (new_status, comment, current_manager_id, now_str, att_id))
             elif action == 'reject':
                 new_status = 'rejected'
                 conn.execute("""
                     UPDATE attendance
                     SET ot_status = ?,
                         ot_approve_comment = ?,
+                        first_approver_id = ?,
                         ot_before_midnight = 0,
                         ot_after_midnight = 0,
                         updated_at = ?
                     WHERE attendance_id = ?
-                """, (new_status, comment, now_str, att_id))
+                """, (new_status, comment, current_manager_id, now_str, att_id))
             else:
                 flash("ไม่รู้จัก action สำหรับ Manager (child)", "danger")
                 return redirect(url_for('ot_approval_list'))
@@ -4447,33 +4450,36 @@ def ot_approve():
                 return redirect(url_for('ot_approval_list'))
             # ถ้า comment ที่ส่งมาจากฟอร์มเป็นค่าว่าง (หรือแค่ whitespace) ให้ใช้ค่า comment เดิมจากฐานข้อมูล
             if not comment.strip():
-                comment = row.get('ot_approve_comment', '')
+                comment = row.get('ot_approve_comment', '')  
             if action == 'approve':
                 new_status = 'approved'
                 conn.execute("""
                     UPDATE attendance
                     SET ot_status = ?,
                         ot_approve_comment = ?,
+                        final_approver_id = ?,
                         updated_at = ?
                     WHERE attendance_id = ?
-                """, (new_status, comment, now_str, att_id))
+                """, (new_status, comment, current_manager_id, now_str, att_id))
             elif action == 'reject':
                 new_status = 'rejected'
                 conn.execute("""
                     UPDATE attendance
                     SET ot_status = ?,
                         ot_approve_comment = ?,
+                        final_approver_id = ?,
                         ot_before_midnight = 0,
                         ot_after_midnight = 0,
                         updated_at = ?
                     WHERE attendance_id = ?
-                """, (new_status, comment, now_str, att_id))
+                """, (new_status, comment, current_manager_id, now_str, att_id))
             else:
                 flash("ไม่รู้จัก action สำหรับ Manager (General)", "danger")
                 return redirect(url_for('ot_approval_list'))
         else:
             flash("ไม่อนุญาตให้ดำเนินการ", "warning")
             return redirect(url_for('ot_approval_list'))
+        
         conn.commit()
         flash("ดำเนินการ OT request เรียบร้อย", "success")
     except Exception as e:
@@ -9004,6 +9010,7 @@ def procedures():
         "AES": ["แพ็คเกจรวม", "Botox", "Filler", "Fat", "ร้อยไหม", "ดริปวิตามิน", "งานผิว", "Voucher"],
         "AFC": ["Set AFC", "ยาทารอย", "Anita", "น้ำลดบวม", "น้ำยาบ้วนปาก", "ยาหยอด", "Cool Pack"],
         "ค่ายาและบริการ": ["ค่ายา", "ค่าโรงพยาบาล", "ตรวจแลป", "จ้างพยาบาล/ผู้ช่วย", "ทำแผล ตัดไหม"],
+        "มัดจำ": ["มัดจำ SX", "มัดจำ AES"],
         "อื่นๆ": ["ปากกาลดน้ำหนัก", "ล้างเล็บ", "อื่นๆ"]
     }
     
@@ -9063,6 +9070,7 @@ def edit_procedure(procedure_id):
         "AES": ["แพ็คเกจรวม", "Botox", "Filler", "Fat", "ร้อยไหม", "ดริปวิตามิน", "งานผิว", "Voucher"],
         "AFC": ["Set AFC", "ยาทารอย", "Anita", "น้ำลดบวม", "น้ำยาบ้วนปาก", "ยาหยอด", "Cool Pack"],
         "ค่ายาและบริการ": ["ค่ายา", "ค่าโรงพยาบาล", "ตรวจแลป", "จ้างพยาบาล/ผู้ช่วย", "ทำแผล ตัดไหม"],
+        "มัดจำ": ["มัดจำ SX", "มัดจำ AES"],
         "อื่นๆ": ["ปากกาลดน้ำหนัก", "ล้างเล็บ", "อื่นๆ"]
     }
     
@@ -10318,6 +10326,325 @@ def monthly_sales_details():
         "admin/monthly_sales_details.html",
         selected_month=selected_month_str,
         list_rows=list_rows
+    )
+
+# Admin online ดูสรุปยอดปิด
+@app.route('/user/monthly_sales_my_details', methods=['GET'])
+@role_required('EMPLOYEE')
+@subcategory_required('monthly_sales_my_details')
+def monthly_sales_my_details():
+    """
+    ฟังก์ชันหน้า User: เลือกเดือน -> สรุปยอดขายแบบละเอียด (by procedure_name)
+    เฉพาะหมวด: SX, AES
+    แสดงเฉพาะข้อมูลของ user ที่ล็อกอิน (session)
+
+    จุดสำคัญที่เพิ่ม:
+      - JOIN/Query ตาราง user_commissions เพื่อนำ commission_value มาใส่
+      - total_amount = count * commission_value
+    """
+
+    # 1) ดึง user_id จาก session
+    current_user_id = session.get('user_id')
+    if not current_user_id:
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+
+    # 2) Query หา pr_code ของ user จากตาราง users
+    user_row = conn.execute("""
+        SELECT user_id, pr_code, first_name, last_name, nickname
+        FROM users
+        WHERE user_id = ?
+    """, (current_user_id, )).fetchone()
+
+    if not user_row:
+        conn.close()
+        return redirect(url_for('login'))
+
+    user_pr_code = user_row['pr_code']
+
+    # 3) กำหนดค่าพื้นฐานและรับ month=YYYY-MM จาก request
+    current_month_str = datetime.now().strftime('%Y-%m')
+    selected_month_str = request.args.get('month', current_month_str).strip()
+
+    try:
+        year_str, mon_str = selected_month_str.split('-')
+        year_int = int(year_str)
+        month_int = int(mon_str)
+    except:
+        year_int = datetime.now().year
+        month_int = datetime.now().month
+        selected_month_str = f"{year_int:04d}-{month_int:02d}"
+
+    start_date = date(year_int, month_int, 1)
+    last_day = calendar.monthrange(year_int, month_int)[1]
+    end_date = date(year_int, month_int, last_day)
+
+    # 4) หมวดที่สนใจ
+    categories = ["SX", "AES"]
+
+    # 5) Query ตาราง daily_income_detail / daily_income_header เฉพาะ pr_code ของ user นี้
+    rows = conn.execute("""
+        SELECT 
+          dih.record_date,
+          did.procedure_category AS cat,
+          did.procedure_name AS pname,
+          did.pr_code1, did.pr_price1,
+          did.pr_code2, did.pr_price2,
+          did.pr_code3, did.pr_price3
+        FROM daily_income_detail did
+        JOIN daily_income_header dih ON did.header_id = dih.id
+        WHERE dih.record_date >= :start_date
+          AND dih.record_date <= :end_date
+          AND did.procedure_category IN ('SX','AES')
+          AND (
+               (did.pr_code1 = :user_pr_code AND did.pr_price1 > 0)
+            OR (did.pr_code2 = :user_pr_code AND did.pr_price2 > 0)
+            OR (did.pr_code3 = :user_pr_code AND did.pr_price3 > 0)
+          )
+        ORDER BY dih.record_date
+    """, {
+        "start_date": start_date.strftime('%Y-%m-%d'),
+        "end_date": end_date.strftime('%Y-%m-%d'),
+        "user_pr_code": user_pr_code
+    }).fetchall()
+
+    # 6) สร้าง structure เก็บยอดขายตาม category & procedure
+    #    sums[(cat, pname)] = {amount, count}
+    sums = {}
+
+    for row in rows:
+        cat = row['cat']
+        pname = row['pname'] or "ไม่ระบุ"
+
+        # ตรวจเฉพาะช่อง pr_code1..3 ที่ตรงกับ user_pr_code
+        for (pcode, price) in [
+            (row['pr_code1'], row['pr_price1']),
+            (row['pr_code2'], row['pr_price2']),
+            (row['pr_code3'], row['pr_price3'])
+        ]:
+            if pcode == user_pr_code and price and price > 0:
+                key = (cat, pname)
+                if key not in sums:
+                    sums[key] = {"amount": 0.0, "count": 0}
+                sums[key]["amount"] += price
+                sums[key]["count"] += 1
+
+    # ------------------------------------------------------------------------------------
+    # 7) โหลดข้อมูลค่าคอมมิชชั่นจากตาราง user_commissions (เฉพาะ user_pr_code นี้)
+    #    แล้วเก็บเป็น dict => comm_map[pname] = { commission_type, commission_value }
+    # ------------------------------------------------------------------------------------
+    comm_rows = conn.execute("""
+        SELECT procedure_name, commission_type, commission_value
+        FROM user_commissions
+        WHERE user_pr_code = ?
+    """, (user_pr_code, )).fetchall()
+    conn.close()
+
+    comm_map = {}
+    for c in comm_rows:
+        pname_c = c["procedure_name"]
+        comm_map[pname_c] = {
+            "type": c["commission_type"],
+            "value": c["commission_value"]
+        }
+
+    # 8) สร้าง list_rows สำหรับส่งไป render ใน template
+    list_rows = []
+    for (cat, pname), val in sums.items():
+        # ค้นหา commission_value
+        # * ถ้าไม่มี record ใน comm_map ให้ตั้งเป็น 0
+        if pname in comm_map:
+            commission_value = comm_map[pname]["value"]
+            commission_type = comm_map[pname]["type"]  # ถ้าต้องการใช้ต่อ
+        else:
+            commission_value = 0.0
+            commission_type = "FIX"  # สมมติ
+
+        # total_amount = count * commission_value
+        # หมายเหตุ: ถ้าต้องการรองรับ PERCENT จริง ๆ ให้ปรับเงื่อนไข
+        total_amount = val["count"] * commission_value
+
+        list_rows.append({
+            "category": cat,
+            "procedure_name": pname,
+            "amount": val["amount"],
+            "count": val["count"],
+            "commission_value": commission_value,
+            "total_amount": total_amount
+        })
+
+    # จัดเรียง
+    def sort_key(row):
+        cat_idx = categories.index(row["category"]) if row["category"] in categories else 999
+        return (cat_idx, row["procedure_name"])
+
+    list_rows.sort(key=sort_key)
+
+    # 9) Render template
+    return render_template(
+        "user/monthly_sales_my_details.html",
+        selected_month=selected_month_str,
+        user_name=f"{user_row['first_name']} {user_row['last_name']}",
+        user_nickname=user_row['nickname'],
+        list_rows=list_rows
+    )
+
+# Admin online ดูรายละเอียดยอดปิด
+@app.route('/user/monthly_sales_my_details_full', methods=['GET'])
+@role_required('EMPLOYEE')
+@subcategory_required('monthly_sales_my_details_full')
+def monthly_sales_my_details_full():
+    """
+    ฟังก์ชันสำหรับให้ User ดูรายละเอียดรายการ (Header + Detail) ของตนเอง
+    โดยกรองจาก pr_codeX ที่ตรงกับ user_pr_code
+    และกรองข้อมูลตาม month=YYYY-MM ในช่วงนั้น
+    """
+
+    # 1) ตรวจสอบว่า user login แล้วหรือยัง
+    current_user_id = session.get('user_id')
+    if not current_user_id:
+        return redirect(url_for('login'))
+
+    # 2) ดึงข้อมูล user จากตาราง users เพื่อใช้ pr_code ในการกรอง
+    conn = get_db_connection()
+    user_row = conn.execute("""
+        SELECT user_id, pr_code, first_name, last_name, nickname
+        FROM users
+        WHERE user_id = ?
+    """, (current_user_id, )).fetchone()
+
+    if not user_row:
+        conn.close()
+        return redirect(url_for('login'))  # หรือแสดง error อื่นตามต้องการ
+
+    user_pr_code = user_row['pr_code']
+
+    # 3) รับ month=YYYY-MM จาก param (ค่า default = เดือนปัจจุบัน)
+    current_month_str = datetime.now().strftime('%Y-%m')
+    selected_month_str = request.args.get('month', current_month_str).strip()
+
+    try:
+        year_str, mon_str = selected_month_str.split('-')
+        year_int = int(year_str)
+        month_int = int(mon_str)
+    except:
+        # fallback กรณี param ไม่ถูกต้อง
+        year_int = datetime.now().year
+        month_int = datetime.now().month
+        selected_month_str = f"{year_int:04d}-{month_int:02d}"
+
+    start_date = date(year_int, month_int, 1)
+    last_day = calendar.monthrange(year_int, month_int)[1]
+    end_date = date(year_int, month_int, last_day)
+
+    # 4) กรองหมวดเฉพาะ
+    categories = ["SX", "AES"]
+
+    # 5) Query JOIN 3 ตาราง: daily_income_header, daily_income_detail และ customers
+    #    เพื่อดึง first_name, last_name ของลูกค้า
+    rows = conn.execute("""
+        SELECT
+          -- ข้อมูลฝั่ง Header
+          dih.id AS header_id,
+          dih.record_date,
+          dih.customer_id,
+          dih.created_at AS header_created_at,
+          
+          -- ดึงข้อมูล customer
+          c.first_name AS customer_first_name,
+          c.last_name AS customer_last_name,
+          c.hn AS customer_hn,
+
+          -- ข้อมูลฝั่ง Detail
+          did.id AS detail_id,
+          did.procedure_doctor,
+          did.procedure_category,
+          did.procedure_name,
+          did.procedure_short_code,
+          did.procedure_price,
+          did.pr_code1, did.pr_price1,
+          did.pr_code2, did.pr_price2,
+          did.pr_code3, did.pr_price3,
+          did.aes_assigned_user_id,
+          did.created_at AS detail_created_at
+
+        FROM daily_income_header dih
+        JOIN daily_income_detail did
+          ON dih.id = did.header_id
+        JOIN customers c
+          ON dih.customer_id = c.id           -- หรือถ้าของจริงเก็บเป็น c.hn ก็ปรับเป็น c.hn
+
+        WHERE dih.record_date >= :start_date
+          AND dih.record_date <= :end_date
+          AND did.procedure_category IN (:cat1, :cat2)
+          AND (
+               (did.pr_code1 = :user_pr_code AND did.pr_price1 > 0)
+            OR (did.pr_code2 = :user_pr_code AND did.pr_price2 > 0)
+            OR (did.pr_code3 = :user_pr_code AND did.pr_price3 > 0)
+          )
+        ORDER BY dih.record_date, dih.id, did.id
+    """, {
+        "start_date": start_date.strftime('%Y-%m-%d'),
+        "end_date": end_date.strftime('%Y-%m-%d'),
+        "user_pr_code": user_pr_code,
+        "cat1": categories[0],
+        "cat2": categories[1],
+    }).fetchall()
+    conn.close()
+
+    # 6) สร้าง list_rows เพื่อส่งไป render Template
+    detail_list = []
+    for row in rows:
+        record_date_str = row['record_date'] if row['record_date'] else ""
+
+        # คำนวณ "ยอดเฉพาะของ User" (ค่าคอม หรือส่วนแบ่ง) จาก pr_code
+        my_pr_amount = 0
+        for pcode, pprice in [
+            (row['pr_code1'], row['pr_price1']),
+            (row['pr_code2'], row['pr_price2']),
+            (row['pr_code3'], row['pr_price3'])
+        ]:
+            if pcode == user_pr_code and pprice:
+                my_pr_amount += pprice
+
+        detail_list.append({
+            # ฝั่ง Header
+            "header_id": row['header_id'],
+            "record_date": record_date_str,
+            "customer_id": row['customer_id'],  # ยังเก็บไว้ใช้ต่อได้
+            "customer_first_name": row['customer_first_name'],
+            "customer_last_name": row['customer_last_name'],
+            "customer_hn": row['customer_hn'],
+            "header_created_at": row['header_created_at'],
+
+            # ฝั่ง Detail
+            "detail_id": row['detail_id'],
+            "procedure_doctor": row['procedure_doctor'],
+            "procedure_category": row['procedure_category'],
+            "procedure_name": row['procedure_name'],
+            "procedure_short_code": row['procedure_short_code'],
+            "procedure_price": row['procedure_price'],
+            "pr_code1": row['pr_code1'],
+            "pr_price1": row['pr_price1'],
+            "pr_code2": row['pr_code2'],
+            "pr_price2": row['pr_price2'],
+            "pr_code3": row['pr_code3'],
+            "pr_price3": row['pr_price3'],
+            "aes_assigned_user_id": row['aes_assigned_user_id'],
+            "detail_created_at": row['detail_created_at'],
+
+            # ยอดของ user คนนี้ (ถ้ามี)
+            "my_pr_amount": my_pr_amount / 1000
+        })
+
+    # 7) Render Template
+    return render_template(
+        "user/monthly_sales_my_details_full.html",
+        selected_month=selected_month_str,
+        user_name=f"{user_row['first_name']} {user_row['last_name']}",
+        user_nickname=user_row['nickname'],
+        detail_list=detail_list
     )
 
 # Incentive User

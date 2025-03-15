@@ -36,7 +36,6 @@
                 <th>วัน-เวลาเลิกงาน</th>
                 <th>เหตุผล</th>
                 <th>อนุมัติเพราะ</th>
-                <th>สถานะ</th>
                 <th>จัดการ</th>
               </tr>
             </thead>
@@ -48,7 +47,6 @@
                 <td>{{ r.checkout_time }}</td>
                 <td>{{ r.ot_reason or '' }}</td>
                 <td>{{ r.ot_approve_comment or '' }}</td>
-                <td>{{ r.ot_status}}</td>
                 <td>
                   <form method="POST" action="{{ url_for('ot_approve') }}">
                     <input type="hidden" name="attendance_id" value="{{ r.attendance_id }}">
@@ -58,8 +56,10 @@
                     </div>
 
                     <div class="btn-group" role="group">
-                      <button class="btn btn-success btn-sm" name="action" value="approve">อนุมัติ</button>
-                      <button class="btn btn-danger btn-sm" name="action" value="reject">ปฏิเสธ</button>
+                      <button class="btn btn-success btn-sm" name="action" value="approve"
+                              onclick="return confirm('ยืนยันการอนุมัติ?');">อนุมัติ</button>
+                      <button class="btn btn-danger btn-sm" name="action" value="reject"
+                              onclick="return confirm('ยืนยันการปฏิเสธ?');">ปฏิเสธ</button>
                     </div>
                   </form>
                 </td>
