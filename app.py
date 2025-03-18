@@ -4392,7 +4392,7 @@ def ot_approval_list():
 @subcategory_required("ot_approve")
 def ot_approve():
     att_id = request.form.get('attendance_id')
-    action = request.form.get('action') 
+    action = request.form.get('action')
     comment = request.form.get('comment', '')
 
     current_subcat = session.get('sub_category_id')
@@ -4414,10 +4414,6 @@ def ot_approve():
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         if current_subcat in (2, 4, 5, 6, 7):
-            old_status = row['ot_status']
-            if old_status != 'pending':
-                flash("ใบ OT นี้ยังไม่ถึงขั้นตอนการอนุมัติ", "warning")
-                return redirect(url_for('ot_approval_list'))
             if action == 'approve':
                 new_status = 'pending_final'
                 conn.execute("""
@@ -4444,13 +4440,13 @@ def ot_approve():
                 flash("ไม่รู้จัก action สำหรับ Manager (child)", "danger")
                 return redirect(url_for('ot_approval_list'))
         elif current_subcat == 3:
+            # สำหรับ Manager (General)
             old_status = row['ot_status']
             if old_status != 'pending_final':
                 flash("ใบ OT นี้ยังไม่ถึงขั้นตอนตัดสินใจขั้นสุดท้าย", "warning")
                 return redirect(url_for('ot_approval_list'))
-            # ถ้า comment ที่ส่งมาจากฟอร์มเป็นค่าว่าง (หรือแค่ whitespace) ให้ใช้ค่า comment เดิมจากฐานข้อมูล
             if not comment.strip():
-                comment = row.get('ot_approve_comment', '')  
+                comment = row.get('ot_approve_comment', '')
             if action == 'approve':
                 new_status = 'approved'
                 conn.execute("""
