@@ -69,7 +69,6 @@ def init_db():
             education_institution TEXT,
             probation BOOLEAN DEFAULT 1,  -- 1 ยังไม่ผ่านโปร, 0 ผ่านโปรแล้ว
             festival_option INTEGER DEFAULT 1,
-            doctor_id INTEGER,
             incentive_sx_rate REAL DEFAULT 0, -- ส่วนคิดค่าคอมฯ
             incentive_aes_rate REAL DEFAULT 0,
             incentive_afc_rate REAL DEFAULT 0,
@@ -83,6 +82,7 @@ def init_db():
             pharmacy REAL DEFAULT 0,
             bonus REAL DEFAULT 0,
             manager REAL DEFAULT 0,
+            doctor_id INTEGER,
             FOREIGN KEY (role_id) REFERENCES roles(role_id),
             FOREIGN KEY (sub_category_id) REFERENCES sub_categories(sub_category_id)
         );
@@ -2725,6 +2725,22 @@ def get_previous_payrolls(user_id, months_to_fetch=3):
 
     conn.close()
     return previous_payrolls
+
+
+
+# to_datetime
+def to_datetime(value, format="%Y-%m-%d"):
+    try:
+        return datetime.strptime(value, format)
+    except Exception as e:
+        # หาก value ไม่มีปี คุณอาจเพิ่ม default year ลงไป เช่น "2020"
+        try:
+            # สมมติว่าค่า value เป็น "MM-DD"
+            return datetime.strptime(f"2025-{value}", "%Y-%m-%d")
+        except Exception as e2:
+            return None
+app.jinja_env.filters['to_datetime'] = to_datetime
+
 
 
 
