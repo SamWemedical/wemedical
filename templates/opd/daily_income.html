@@ -81,7 +81,9 @@
             </button>
 
             <!-- เงื่อนไข: เฉพาะวันปัจจุบัน ถึงจะแก้ไข/ลบได้ -->
-            {% if record_date|default(current_date) == current_date %}
+            {% set curr_date = current_date|to_datetime("%Y-%m-%d") %}
+            {% set rec_date = record_date|default(current_date)|to_datetime("%Y-%m-%d") %}
+            {% if (curr_date - rec_date).days >= 0 and (curr_date - rec_date).days <= 30 %}
               <a href="{{ url_for('edit_daily_income', income_id=rec.id) }}"
                 class="btn btn-sm btn-warning">
                 แก้ไข
@@ -95,6 +97,7 @@
                 </button>
               </form>
             {% endif %}
+
           </td>
         </tr>
       {% endfor %}
