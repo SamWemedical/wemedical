@@ -3355,7 +3355,7 @@ def user_list():
 
 # Change Password
 @app.route('/user/change_password', methods=['GET', 'POST'])
-@role_required('ADMIN', 'HR', 'MANAGER', 'EMPLOYEE', 'OPD', 'SECRETARY')
+@role_required('ADMIN', 'HR', 'MANAGER', 'EMPLOYEE', 'OPD', 'SECRETARY', 'DOCTOR')
 def change_password():
     user_id = session.get('user_id')
     conn = get_db_connection()
@@ -5331,20 +5331,15 @@ def leave_approve():
       - Manager(general) subcat=3 => final approve
     """
     leave_id = request.form['leave_id']
-    leave_start = request.form['start_date']
-    action = request.form['action']  # 'approve', 'reject', 'conditional'
+    action = request.form['action']
     new_leave_type = request.form.get('new_leave_type', None)
     hr_comment = request.form.get('hr_comment', '')
-
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    current_role = session.get('role')
     current_subcat = session.get('sub_category_id')
     current_manager_id = session.get('user_id')
     
     conn = get_db_connection()
     try:
-        # 1) โหลดข้อมูลใบลา
         leave_req = conn.execute("""
             SELECT user_id, leave_type, days_requested, start_date, status
             FROM leave_requests
@@ -5362,23 +5357,15 @@ def leave_approve():
         start_date_str = leave_req['start_date']
         req_year = int(start_date_str[:4])
         
-        # หากมี new_leave_type => เปลี่ยนประเภทลา
         final_leave_type = new_leave_type if new_leave_type else old_leave_type
         
-        # ถ้า current_role=='HR': => อนุญาตให้ทำงานเหมือน manager(child)
-
-        # แยกเป็น 2 ส่วน: (1) HR หรือ Manager(child) subcat != 3, (2) Manager(general) subcat=3
-        if (current_role == 'HR' or current_role.startswith("MANAGER")) and str(current_subcat) != "3":
-            # ----- ส่วน HR กับ Manager(child) -----
-            # (1) ถ้า action='approve' หรือ 'conditional' => เปลี่ยนสถานะเป็น 'pending_final'
+        if current_subcat in (2, 4, 5, 6, 7):
             if action in ['approve','conditional']:
-                # เช็ค leftover on-the-fly (ถ้าใบลาสถานะยังเป็น pending, กำลังจะ up เป็น 'pending_final')
+                # เช็ค leftover on-the-fly
                 if old_status in ('pending', 'pending_hr'):
-                    # leftover check
                     if final_leave_type in ['ลาพักร้อน','ลากิจ','ลาป่วย','ลางานศพ (ไม่หักเงิน)','ลาเทศกาล']:
                         leftover = get_on_the_fly_leftover_exclude(employee_id, final_leave_type, req_year, exclude_leave_id=leave_id)
                         if days_requested > leftover:
-                            # Auto reject
                             flash(f"สิทธิ์ {final_leave_type} ไม่เพียงพอ (เหลือ {leftover}, ขอ {days_requested}) => auto-reject", "danger")
                             conn.execute("""
                                 UPDATE leave_requests
@@ -5386,37 +5373,21 @@ def leave_approve():
                                     hr_comment=?,
                                     updated_at=?
                                 WHERE leave_id=?
-                            """, (f"{hr_comment} (auto reject leftover not enough)", now_str, leave_id))
+                            """, (f"{hr_comment} (ประเภทการลาไม่ถูกต้อง, สิทธิ์ลาไม่เพียงพอ)", now_str, leave_id))
                             conn.commit()
                             conn.close()
                             return redirect(url_for('leave_approval_list'))
                 
-                # ดึง final manager(general) user_id
-                employee_data = conn.execute("SELECT sub_category_id FROM users WHERE user_id=?", (employee_id,)).fetchone()
-                if not employee_data:
-                    flash("ไม่พบข้อมูล employee subcat", "warning")
-                    conn.close()
-                    return redirect(url_for('leave_approval_list'))
-                employee_subcat = employee_data['sub_category_id']
-                final_manager_id = get_parent_manager_for_employee(employee_subcat)  # manager(general)
-                if not final_manager_id:
-                    flash("ไม่พบ Manager General สำหรับส่งต่อใบลา", "warning")
-                    conn.close()
-                    return redirect(url_for('leave_approval_list'))
-                
                 new_status = 'pending_final'
-                
-                # update DB
                 conn.execute("""
                     UPDATE leave_requests
                     SET status=?,
                         leave_type=?,
                         hr_comment=?,
                         updated_at=?,
-                        first_approver_id=?,
-                        final_approver_id=?
+                        first_approver_id=?
                     WHERE leave_id=?
-                """, (new_status, final_leave_type, hr_comment, now_str, current_manager_id, final_manager_id, leave_id))
+                """, (new_status, final_leave_type, hr_comment, now_str, current_manager_id, leave_id))
             
             elif action == 'reject':
                 new_status = 'rejected'
@@ -5425,15 +5396,15 @@ def leave_approve():
                     SET status=?,
                         hr_comment=?,
                         updated_at=?
+                        first_approver_id=?
                     WHERE leave_id=?
-                """, (new_status, hr_comment, now_str, leave_id))
+                """, (new_status, hr_comment, now_str, current_manager_id, leave_id))
             else:
                 flash("ไม่รู้จัก action สำหรับ HR/Manager(child)", "danger")
                 conn.close()
                 return redirect(url_for('leave_approval_list'))
         
-        elif (current_role.startswith("MANAGER") or current_role=='HR') and str(current_subcat) == "3":
-            # ----- ส่วน Manager(general) subcat=3 => final approve -----
+        elif current_subcat == 3:
             if old_status != 'pending_final':
                 flash("ใบลานี้ยังไม่ถึงขั้นตอนให้ ผจก. อนุมัติ", "warning")
                 conn.close()
@@ -5448,18 +5419,18 @@ def leave_approve():
                             leave_type=?,
                             hr_comment=?,
                             updated_at=?,
-                            first_approver_id=?,
                             final_approver_id=?
                         WHERE leave_id=?
-                    """, (new_status, final_leave_type, hr_comment, now_str, current_manager_id, current_manager_id, leave_id))
+                    """, (new_status, final_leave_type, hr_comment, now_str, current_manager_id, leave_id))
                 else:
                     conn.execute("""
                         UPDATE leave_requests
                         SET status=?,
                             hr_comment=?,
                             updated_at=?
+                            final_approver_id=?
                         WHERE leave_id=?
-                    """, (new_status, hr_comment, now_str, leave_id))
+                    """, (new_status, hr_comment, now_str, current_manager_id, leave_id))
             elif action == 'reject':
                 new_status = 'rejected'
                 conn.execute("""
@@ -5467,8 +5438,9 @@ def leave_approve():
                     SET status=?,
                         hr_comment=?,
                         updated_at=?
+                        final_approver_id=?
                     WHERE leave_id=?
-                """, (new_status, hr_comment, now_str, leave_id))
+                """, (new_status, hr_comment, now_str, current_manager_id, leave_id))
             else:
                 flash("ไม่รู้จัก action สำหรับ Manager(general)", "danger")
                 conn.close()
@@ -5481,11 +5453,11 @@ def leave_approve():
 
         # แจ้งเตือน employee ทราบ
         if new_status == 'approved':
-            message = f"ใบลาวันที่ {leave_start} ได้รับการอนุมัติ"
+            message = f"ใบลาวันที่ {start_date_str} ได้รับการอนุมัติ"
         elif new_status == 'rejected':
-            message = f"ใบลาวันที่ {leave_start} ถูกปฏิเสธ: {hr_comment}"
+            message = f"ใบลาวันที่ {start_date_str} ถูกปฏิเสธ: {hr_comment}"
         else:
-            message = f"ใบลาวันที่ {leave_start} ถูกปรับเป็น: {final_leave_type}"
+            message = f"ใบลาวันที่ {start_date_str} ถูกปรับเป็น: {final_leave_type}"
 
         add_notification_with_connection(conn, employee_id, message)
 
@@ -8901,7 +8873,7 @@ def fromjson_filter(s):
 
 # 4.2 View Customer List
 @app.route('/customer_list')
-@role_required('ADMIN', 'OPD')
+@role_required('ADMIN', 'OPD', 'DOCTOR')
 def customer_list():
     conn = get_db_connection()
     page = int(request.args.get('page', 1))
@@ -8938,6 +8910,14 @@ def customer_list():
         total_count = conn.execute("SELECT COUNT(*) as count FROM customers").fetchone()['count']
         total_pages = (total_count // per_page) + (1 if total_count % per_page else 0)
     conn.close()
+
+    customers = [dict(c) for c in customers]
+    for customer in customers:
+        customer["calculated_age"] = calc_age(customer.get("birthday", ""))
+
+    if search_results is not None:
+        # ถ้ามี search_results, ให้ใช้ผลลัพธ์จาก customers ที่เราอัพเดทแล้ว
+        search_results = customers
 
     return render_template(
         'opd/customer_list.html',
@@ -9495,7 +9475,6 @@ def edit_daily_income(income_id):
 def delete_daily_income(income_id):
     conn = get_db_connection()
     try:
-        # 1) ตรวจสอบว่ารายการนี้มีจริงหรือไม่ และ record_date คือวันไหน
         header_row = conn.execute("""
             SELECT record_date
             FROM daily_income_header
@@ -9507,16 +9486,17 @@ def delete_daily_income(income_id):
             conn.close()
             return redirect(url_for('daily_income'))
         
-        # 2) ถ้าต้องการลบได้เฉพาะวันปัจจุบัน ให้เช็ค
-        current_date = datetime.now().strftime('%Y-%m-%d')
-        if header_row["record_date"] != current_date:
-            flash("Cannot delete records from past or future dates", "danger")
+        current_date = datetime.now().date()
+        record_date = datetime.strptime(header_row["record_date"], "%Y-%m-%d").date()
+        diff_days = (current_date - record_date).days
+
+        # ตรวจสอบว่า record_date อยู่ในอนาคต (diff_days < 0) หรือมากกว่า 30 วันย้อนหลัง (diff_days > 30)
+        if diff_days > 30:
+            flash("ไม่สามารถลบย้อนหลังได้", "danger")
             conn.close()
             return redirect(url_for('daily_income', record_date=header_row["record_date"]))
         
-        # 3) ลบ detail ก่อน
         conn.execute("DELETE FROM daily_income_detail WHERE header_id = ?", (income_id,))
-        # 4) ลบ header
         conn.execute("DELETE FROM daily_income_header WHERE id = ?", (income_id,))
         
         conn.commit()
