@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Edit Customer (English)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f9f9f9; }
+    .container { max-width: 900px; margin: 40px auto; }
+  </style>
+</head>
+<body>
+<div class="container-fluid">
+  <h2 class="mb-4">Edit Customer (HN: {{ customer['hn'] }})</h2>
+  <h6 class="mb-4">*Please check or fill in all required fields*</h6>
+
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <form method="POST" id="editCustomerForm">
+    <!-- 1) HN (read-only) -->
+    <div class="mb-3">
+      <label class="form-label">HN (Read-only)</label>
+      <input type="text" class="form-control" value="{{ customer['hn'] }}" disabled>
+    </div>
+
+    <!-- 2) Title -->
+    <div class="mb-3">
+      <label for="prefix" class="form-label">Title</label>
+      <select class="form-select" id="prefix" name="prefix" required>
+        <option value="">Select Title</option>
+        <option value="Mr."    {% if customer['prefix'] == 'Mr.'    %}selected{% endif %}>Mr.</option>
+        <option value="Mrs."   {% if customer['prefix'] == 'Mrs.'   %}selected{% endif %}>Mrs.</option>
+        <option value="Miss"   {% if customer['prefix'] == 'Miss'   %}selected{% endif %}>Miss</option>
+      </select>
+    </div>
+
+    <!-- 3) First Name -->
+    <div class="mb-3">
+      <label for="first_name" class="form-label">First Name</label>
+      <input type="text" class="form-control" id="first_name" name="first_name" 
+             value="{{ customer['first_name']|default('') }}" required>
+    </div>
+
+    <!-- 4) Last Name -->
+    <div class="mb-3">
+      <label for="last_name" class="form-label">Last Name</label>
+      <input type="text" class="form-control" id="last_name" name="last_name"
+             value="{{ customer['last_name']|default('') }}" required>
+    </div>
+
+    <!-- 5) Nickname -->
+    <div class="mb-3">
+      <label for="nickname" class="form-label">Nickname</label>
+      <input type="text" class="form-control" id="nickname" name="nickname"
+             value="{{ customer['nickname']|default('') }}" required>
+    </div>
+
+    <!-- 6) Phone (แยก country_code + phone_number) -->
+    <div class="mb-3">
+      <label for="phone" class="form-label">Phone Number</label>
+      <div class="input-group">
+        <select class="form-select" id="country_code" name="country_code" required style="max-width: 200px;">
+          <<option value="+66">+66 (Thailand)</option>
+          <option value="+62">+62 (Indonesia)</option>
+          <option value="+60">+60 (Malaysia)</option>
+          <option value="+65">+65 (Singapore)</option>
+          <option value="+95">+95 (Myanmar)</option>
+          <option value="+856">+856 (Laos)</option>
+          <option value="+855">+855 (Cambodia)</option>
+          <option value="+1">+1 (USA)</option>
+          <option value="+44">+44 (UK)</option>
+          <option value="+61">+61 (Australia)</option>
+          <option value="+81">+81 (Japan)</option>
+          <option value="+86">+86 (China)</option>
+          <option value="+49">+49 (Germany)</option>
+          <option value="+33">+33 (France)</option>
+          <option value="other">Other</option>
+        </select>
+        <input type="text" class="form-control" id="custom_country_code" name="custom_country_code"
+               placeholder="Enter country code (without +)" style="display: none; max-width: 200px;">
+        <input type="tel" class="form-control" id="phone" name="phone" required>
+      </div>
+    </div>
+    <script>
+      // Same logic as in registration to parse phone
+      let knownCodes = [
+        "+66","+62","+60","+95","+856","+855","+44","+61","+81","+86","+49","+33","+91"
+      ];
+      function parseFullPhone(fullPhone) {
+        // Try match with knownCodes
+        for (let code of knownCodes) {
+          if (fullPhone.startsWith(code)) {
+            // matched
+            document.getElementById('country_code').value = code;
+            document.getElementById('phone').value = fullPhone.substring(code.length);
+            return;
+          }
+        }
+        // if not found => maybe +xx is custom or no plus
+        if (fullPhone.startsWith('+')) {
+          // set "other"
+          document.getElementById('country_code').value = "other";
+          document.getElementById('custom_country_code').style.display = "block";
+          document.getElementById('custom_country_code').value = fullPhone.substring(1); // cut '+'
+          // phone = ""
+          document.getElementById('phone').value = "";
+        } else {
+          // fallback => assume +66
+          document.getElementById('country_code').value = "+66";
+          document.getElementById('phone').value = fullPhone;
+        }
+      }
+
+      document.getElementById('country_code').addEventListener('change', function(){
+        if (this.value === "other") {
+          document.getElementById('custom_country_code').style.display = "block";
+          document.getElementById('custom_country_code').setAttribute('required','required');
+        } else {
+          document.getElementById('custom_country_code').style.display = "none";
+          document.getElementById('custom_country_code').removeAttribute('required');
+        }
+      });
+
+      window.addEventListener('DOMContentLoaded', function(){
+        let fullPhone = "{{ customer['phone']|default('') }}";
+        parseFullPhone(fullPhone);
+      });
+    </script>
+
+    <!-- 7) Passport -->
+    <div class="mb-3">
+      <label for="id_value" class="form-label">Passport Number</label>
+      <input type="text" class="form-control" id="id_value" name="id_value"
+             value="{{ customer['id_card_or_passport']|default('') }}" required>
+    </div>
+
+    <!-- 8) Birthday -->
+    <div class="mb-3">
+      <label for="birthday" class="form-label">Birthday</label>
+      <input type="date" class="form-control" id="birthday" name="birthday"
+             value="{{ customer['birthday']|default('') }}" required>
+    </div>
+
+    <!-- 9) Nationality (Pre-check if not in the list => "Other") -->
+    <div class="mb-3">
+      <label for="nationality" class="form-label">Nationality</label>
+      <select class="form-select" id="nationality" name="nationality" required>
+        <option value="">Select Nationality</option>
+        <option value="Indonesian">Indonesian</option>
+        <option value="Malaysian">Malaysian</option>
+        <option value="Singaporean">Singaporean</option>
+        <option value="Myanmar">Myanmar</option>
+        <option value="Laos">Laos</option>
+        <option value="Cambodian">Cambodian</option>
+        <option value="USA">USA</option>
+        <option value="UK">UK</option>
+        <option value="Australian">Australian</option>
+        <option value="Japanese">Japanese</option>
+        <option value="Chinese">Chinese</option>
+        <option value="German">German</option>
+        <option value="French">French</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="mb-3" id="otherNationalityContainer" style="display: none;">
+      <label for="nationality_other" class="form-label">Please specify nationality</label>
+      <input type="text" class="form-control" id="nationality_other" name="nationality_other">
+    </div>
+    <script>
+      let knownNations = ["Indonesian","Malaysian","Singaporean","Myanmar","Laos","Cambodian","USA","UK","Australian","Japanese","Chinese","German","French"];
+      function checkNationality() {
+        let nat = "{{ customer['nationality']|default('') }}";
+        let selectEl = document.getElementById('nationality');
+        let otherContainer = document.getElementById('otherNationalityContainer');
+        let otherInput = document.getElementById('nationality_other');
+
+        // ถ้า nat อยู่ใน knownNations => set selected
+        if (knownNations.indexOf(nat) >= 0) {
+          selectEl.value = nat;
+          otherContainer.style.display = 'none';
+          otherInput.removeAttribute('required');
+        } else if (nat === "" || nat === null) {
+          // ไม่ใส่อะไร
+          selectEl.value = "";
+        } else {
+          // not in known => "Other"
+          selectEl.value = "Other";
+          otherContainer.style.display = 'block';
+          otherInput.setAttribute('required','required');
+          otherInput.value = nat; // ใส่ค่าเก่า
+        }
+      }
+      document.getElementById('nationality').addEventListener('change', function(){
+        if (this.value === "Other") {
+          document.getElementById('otherNationalityContainer').style.display = 'block';
+          document.getElementById('nationality_other').setAttribute('required','required');
+        } else {
+          document.getElementById('otherNationalityContainer').style.display = 'none';
+          document.getElementById('nationality_other').removeAttribute('required');
+        }
+      });
+      window.addEventListener('DOMContentLoaded', checkNationality);
+    </script>
+
+    <!-- 10) Address/Hotel -->
+    <div class="mb-3">
+      <label for="address" class="form-label">Address / Hotel</label>
+      <textarea class="form-control" id="address" name="address" rows="2" required>{{ customer['address']|default('') }}</textarea>
+    </div>
+
+    <!-- 11) Occupation -->
+    <div class="mb-3">
+      <label for="occupation" class="form-label">Occupation</label>
+      <input type="text" class="form-control" id="occupation" name="occupation"
+             value="{{ customer['occupation']|default('') }}" required>
+    </div>
+
+    <!-- 12) Emergency Contact, Relationship, Phone -->
+    <div class="mb-3">
+      <label class="form-label">Emergency Contact Name</label>
+      <input type="text" class="form-control" id="emergency_contact" name="emergency_contact"
+             value="{{ customer['emergency_contact']|default('') }}" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Relationship with Emergency Contact</label>
+      <input type="text" class="form-control" id="emergency_relationship" name="emergency_relationship"
+             value="{{ customer['emergency_relationship']|default('') }}" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Emergency Phone</label>
+      <input type="tel" class="form-control" id="emergency_phone" name="emergency_phone"
+             value="{{ customer['emergency_phone']|default('') }}" required>
+    </div>
+
+    <!-- 13) Drug Allergy (Pre-fill radio & text) -->
+    {% set allergy_val = customer['drug_allergy_history']|default('') %}
+    <div class="mb-3">
+      <label class="form-label">Drug Allergy History</label>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="drug_allergy_history_choice" id="drug_allergy_none" value="No"
+               {% if not allergy_val %}checked{% endif %}>
+        <label class="form-check-label" for="drug_allergy_none">No</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="drug_allergy_history_choice" id="drug_allergy_yes" value="Yes"
+               {% if allergy_val %}checked{% endif %}>
+        <label class="form-check-label" for="drug_allergy_yes">Yes</label>
+      </div>
+      <div class="mt-2" id="drugAllergyDetailsContainer" style="display: none;">
+        <input type="text" class="form-control mb-2" id="drug_allergy_details" name="drug_allergy_details" placeholder="Please specify drug allergy details">
+        <input type="text" class="form-control" id="drug_allergy_symptoms" name="drug_allergy_symptoms" placeholder="Please specify allergy symptoms">
+      </div>
+    </div>
+    <script>
+      function parseAllergyString(allergyString) {
+        let details = "";
+        let symptoms = "";
+        let openParen = allergyString.indexOf('(');
+        let closeParen = allergyString.indexOf(')');
+        if (openParen >= 0 && closeParen > openParen) {
+          details = allergyString.substring(0, openParen).trim();
+          symptoms = allergyString.substring(openParen+1, closeParen).trim();
+        } else {
+          details = allergyString;
+        }
+        return {details, symptoms};
+      }
+      document.getElementById('drug_allergy_yes').addEventListener('change', function(){
+        var container = document.getElementById('drugAllergyDetailsContainer');
+        container.style.display = 'block';
+        document.getElementById('drug_allergy_details').setAttribute('required','required');
+        document.getElementById('drug_allergy_symptoms').setAttribute('required','required');
+      });
+      document.getElementById('drug_allergy_none').addEventListener('change', function(){
+        var container = document.getElementById('drugAllergyDetailsContainer');
+        container.style.display = 'none';
+        document.getElementById('drug_allergy_details').removeAttribute('required');
+        document.getElementById('drug_allergy_symptoms').removeAttribute('required');
+      });
+      window.addEventListener('DOMContentLoaded', function(){
+        let allergyVal = "{{ allergy_val }}".trim();
+        if (allergyVal) {
+          document.getElementById('drugAllergyDetailsContainer').style.display = 'block';
+          let parsed = parseAllergyString(allergyVal);
+          document.getElementById('drug_allergy_details').value = parsed.details;
+          document.getElementById('drug_allergy_symptoms').value = parsed.symptoms;
+          document.getElementById('drug_allergy_details').setAttribute('required','required');
+          document.getElementById('drug_allergy_symptoms').setAttribute('required','required');
+        }
+      });
+    </script>
+
+    <!-- 14) Chronic Disease -->
+    {% set chronic_val = customer['chronic_disease']|default('') %}
+    <div class="mb-3">
+      <label class="form-label">Chronic Disease</label>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="chronic_disease_choice" id="disease_none" value="No"
+               {% if not chronic_val %}checked{% endif %}>
+        <label class="form-check-label" for="disease_none">None</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="chronic_disease_choice" id="disease_yes" value="Yes"
+               {% if chronic_val %}checked{% endif %}>
+        <label class="form-check-label" for="disease_yes">Yes</label>
+      </div>
+      <div class="mt-2" id="chronicDiseaseDetailsContainer" style="display: none;">
+        <input type="text" class="form-control" id="chronic_disease_details" name="chronic_disease_details" placeholder="Please specify chronic diseases">
+      </div>
+    </div>
+    <script>
+      document.getElementById('disease_yes').addEventListener('change', function(){
+        document.getElementById('chronicDiseaseDetailsContainer').style.display = 'block';
+        document.getElementById('chronic_disease_details').setAttribute('required','required');
+      });
+      document.getElementById('disease_none').addEventListener('change', function(){
+        document.getElementById('chronicDiseaseDetailsContainer').style.display = 'none';
+        document.getElementById('chronic_disease_details').removeAttribute('required');
+      });
+      window.addEventListener('DOMContentLoaded', function(){
+        if ("{{ chronic_val }}".trim()) {
+          document.getElementById('chronicDiseaseDetailsContainer').style.display = 'block';
+          document.getElementById('chronic_disease_details').value = "{{ chronic_val }}";
+          document.getElementById('chronic_disease_details').setAttribute('required','required');
+        }
+      });
+    </script>
+
+    <!-- 15) Current Medications -->
+    {% set med_val = customer['current_medications']|default('') %}
+    <div class="mb-3">
+      <label class="form-label">Current Medications</label>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="current_medications_choice" id="med_none" value="No"
+               {% if not med_val %}checked{% endif %}>
+        <label class="form-check-label" for="med_none">None</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="current_medications_choice" id="med_yes" value="Yes"
+               {% if med_val %}checked{% endif %}>
+        <label class="form-check-label" for="med_yes">Yes</label>
+      </div>
+      <div class="mt-2" id="medicationsDetailsContainer" style="display: none;">
+        <input type="text" class="form-control" id="current_medications_details" name="current_medications_details" placeholder="Please specify current medications">
+      </div>
+    </div>
+    <script>
+      document.getElementById('med_yes').addEventListener('change', function(){
+        document.getElementById('medicationsDetailsContainer').style.display = 'block';
+        document.getElementById('current_medications_details').setAttribute('required','required');
+      });
+      document.getElementById('med_none').addEventListener('change', function(){
+        document.getElementById('medicationsDetailsContainer').style.display = 'none';
+        document.getElementById('current_medications_details').removeAttribute('required');
+      });
+      window.addEventListener('DOMContentLoaded', function(){
+        if ("{{ med_val }}".trim()) {
+          document.getElementById('medicationsDetailsContainer').style.display = 'block';
+          document.getElementById('current_medications_details').value = "{{ med_val }}";
+          document.getElementById('current_medications_details').setAttribute('required','required');
+        }
+      });
+    </script>
+
+    <!-- 16) Previous Surgeries -->
+    {% set surgeries_val = customer['previous_surgeries']|default('') %}
+    <div class="mb-3">
+      <label class="form-label">Previous Surgery Experience</label>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="surgery_experience_choice" id="surgery_never" value="never">
+        <label class="form-check-label" for="surgery_never">Never</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="surgery_experience_choice" id="surgery_ever" value="ever">
+        <label class="form-check-label" for="surgery_ever">Ever (Select one or more)</label>
+      </div>
+      <div id="surgeryChoicesContainer" style="display: none; margin-top: 10px;">
+        <!-- ตัวอย่าง checkbox Nose, Chin, etc. -->
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_nose" name="previous_surgeries" value="Nose">
+          <label class="form-check-label" for="surgery_nose">Nose</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_mouth" name="previous_surgeries" value="Lips">
+          <label class="form-check-label" for="surgery_mouth">Mouth</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_eyes" name="previous_surgeries" value="Eyes">
+          <label class="form-check-label" for="surgery_eyes">Eyes</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_browlift" name="previous_surgeries" value="Brow Lift">
+          <label class="form-check-label" for="surgery_browlift">Brow Lift</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_facelift" name="previous_surgeries" value="Facelift">
+          <label class="form-check-label" for="surgery_facelift">Facelift</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_breast" name="previous_surgeries" value="Breast">
+          <label class="form-check-label" for="surgery_breast">Breast</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_liposuction" name="previous_surgeries" value="Liposuction">
+          <label class="form-check-label" for="surgery_liposuction">Liposuction</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_fattransfer" name="previous_surgeries" value="Fat Transfer">
+          <label class="form-check-label" for="surgery_fattransfer">Fat Transfer</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="surgery_other" name="previous_surgeries" value="other">
+          <label class="form-check-label" for="surgery_other">Other</label>
+        </div>
+        <div class="mt-2" id="otherSurgeryTextboxContainer" style="display: none;">
+          <input type="text" class="form-control" id="surgery_other_text" name="surgery_other_text" placeholder="Please specify">
+        </div>
+      </div>
+    </div>
+    <script>
+      function preCheckSurgeries() {
+        let val = "{{ surgeries_val }}".trim(); 
+        if (!val) {
+          // No surgeries => "never"
+          document.getElementById('surgery_never').checked = true;
+          return;
+        }
+        // If there's something => "ever"
+        document.getElementById('surgery_ever').checked = true;
+        document.getElementById('surgeryChoicesContainer').style.display = 'block';
+
+        // Split by comma
+        let arr = val.split(", ");
+        arr.forEach(item => {
+          let trimmed = item.trim();
+          if (trimmed.startsWith("Other:")) {
+            document.getElementById('surgery_other').checked = true;
+            document.getElementById('otherSurgeryTextboxContainer').style.display = 'block';
+            let extraText = trimmed.substring(5).replace(":","").trim(); 
+            document.getElementById('surgery_other_text').value = extraText; 
+            document.getElementById('surgery_other_text').setAttribute('required','required');
+          } else {
+            let cb = document.querySelector('input[name="previous_surgeries"][value="'+trimmed+'"]');
+            if (cb) cb.checked = true;
+          }
+        });
+      }
+
+      document.getElementById('surgery_never').addEventListener('change', function(){
+        if (this.checked) {
+          document.getElementById('surgeryChoicesContainer').style.display = 'none';
+          let checkboxes = document.querySelectorAll('#surgeryChoicesContainer input[type="checkbox"]');
+          checkboxes.forEach(cb => cb.checked = false);
+          document.getElementById('otherSurgeryTextboxContainer').style.display = 'none';
+          document.getElementById('surgery_other_text').removeAttribute('required');
+        }
+      });
+      document.getElementById('surgery_ever').addEventListener('change', function(){
+        if (this.checked) {
+          document.getElementById('surgeryChoicesContainer').style.display = 'block';
+        }
+      });
+      document.getElementById('surgery_other').addEventListener('change', function(){
+        let c = document.getElementById('otherSurgeryTextboxContainer');
+        let t = document.getElementById('surgery_other_text');
+        if (this.checked) {
+          c.style.display = 'block';
+          t.setAttribute('required','required');
+        } else {
+          c.style.display = 'none';
+          t.removeAttribute('required');
+        }
+      });
+      window.addEventListener('DOMContentLoaded', preCheckSurgeries);
+    </script>
+
+    <!-- 17) Referral Channel -->
+    {% set referral_val = customer['referral_channel']|default('') %}
+    <div class="mb-3">
+      <label class="form-label">How did you hear about WE clinic? (Select one or more)</label>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="referral_facebook" name="referral_channel" value="Facebook">
+        <label class="form-check-label" for="referral_facebook">Facebook</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="referral_line" name="referral_channel" value="Line">
+        <label class="form-check-label" for="referral_line">Line</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="referral_instagram" name="referral_channel" value="Instagram">
+        <label class="form-check-label" for="referral_instagram">Instagram</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="referral_tiktok" name="referral_channel" value="TikTok">
+        <label class="form-check-label" for="referral_tiktok">TikTok</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="referral_friend" name="referral_channel" value="Friend/Relative">
+        <label class="form-check-label" for="referral_friend">Friend/Relative</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="referral_other" name="referral_channel" value="other">
+        <label class="form-check-label" for="referral_other">Other</label>
+      </div>
+      <div class="mt-2" id="otherReferralContainer" style="display: none;">
+        <input type="text" class="form-control" id="referral_other_text" name="referral_other_text" placeholder="Please specify">
+      </div>
+    </div>
+    <script>
+      function preCheckReferral() {
+        let refVal = "{{ referral_val }}";
+        if (!refVal) return;
+        let arr = refVal.split(", ");
+        arr.forEach(item => {
+          let trimmed = item.trim();
+          if (trimmed.startsWith("Other:")) {
+            document.getElementById('referral_other').checked = true;
+            document.getElementById('otherReferralContainer').style.display = 'block';
+            let extra = trimmed.substring(5).replace(':','').trim();
+            document.getElementById('referral_other_text').value = extra;
+            document.getElementById('referral_other_text').setAttribute('required','required');
+          } else {
+            let cb = document.querySelector('input[name="referral_channel"][value="'+trimmed+'"]');
+            if (cb) cb.checked = true;
+          }
+        });
+      }
+      document.getElementById('referral_other').addEventListener('change', function(){
+        let c = document.getElementById('otherReferralContainer');
+        let t = document.getElementById('referral_other_text');
+        if (this.checked) {
+          c.style.display = 'block';
+          t.setAttribute('required','required');
+        } else {
+          c.style.display = 'none';
+          t.removeAttribute('required');
+          t.value = "";
+        }
+      });
+      window.addEventListener('DOMContentLoaded', preCheckReferral);
+    </script>
+
+    <!-- 18) Reason to choose clinic -->
+    {% set reason_val = customer['reason_to_choose_clinic']|default('') %}
+    <div class="mb-3">
+      <label class="form-label">Reason for Choosing WE Clinic (Select one or more)</label>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_reputation" name="reason_to_choose_clinic" value="Doctor & Clinic Reputation">
+        <label class="form-check-label" for="reason_reputation">Doctor & Clinic Reputation</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_doctor_skill" name="reason_to_choose_clinic" value="Doctor Skill">
+        <label class="form-check-label" for="reason_doctor_skill">Doctor Skill</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_shape" name="reason_to_choose_clinic" value="Post-op Result">
+        <label class="form-check-label" for="reason_shape">Post-op Result</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_price" name="reason_to_choose_clinic" value="Reasonable Price">
+        <label class="form-check-label" for="reason_price">Reasonable Price</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_advertising" name="reason_to_choose_clinic" value="Saw Advertising">
+        <label class="form-check-label" for="reason_advertising">Saw Advertising</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_location" name="reason_to_choose_clinic" value="Easy to Travel">
+        <label class="form-check-label" for="reason_location">Easy to Travel</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_service" name="reason_to_choose_clinic" value="Staff's Service">
+        <label class="form-check-label" for="reason_service">Staff's Service</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="reason_other" name="reason_to_choose_clinic" value="Others">
+        <label class="form-check-label" for="reason_other">Others</label>
+      </div>
+      <div class="mt-2" id="otherReasonContainer" style="display: none;">
+        <input type="text" class="form-control" id="reason_other_text" name="reason_other_text" placeholder="Please specify your reason">
+      </div>
+    </div>
+    <script>
+      function preCheckReason() {
+        let reasonVal = "{{ reason_val }}";
+        if (!reasonVal) return;
+        let arr = reasonVal.split(", ");
+        arr.forEach(item => {
+          let trimmed = item.trim();
+          if (trimmed.startsWith("Others:")) {
+            document.getElementById('reason_other').checked = true;
+            document.getElementById('otherReasonContainer').style.display = 'block';
+            let extra = trimmed.substring(6).replace(':','').trim();
+            document.getElementById('reason_other_text').value = extra;
+            document.getElementById('reason_other_text').setAttribute('required','required');
+          } else {
+            let cb = document.querySelector('input[name="reason_to_choose_clinic"][value="'+trimmed+'"]');
+            if (cb) cb.checked = true;
+          }
+        });
+      }
+      document.getElementById('reason_other').addEventListener('change', function(){
+        let c = document.getElementById('otherReasonContainer');
+        let t = document.getElementById('reason_other_text');
+        if (this.checked) {
+          c.style.display = 'block';
+          t.setAttribute('required','required');
+        } else {
+          c.style.display = 'none';
+          t.removeAttribute('required');
+          t.value = "";
+        }
+      });
+      window.addEventListener('DOMContentLoaded', preCheckReason);
+    </script>
+
+    <!-- Confirmation / Submit -->
+    <button type="submit" class="btn btn-primary">Save Changes</button>
+  </form>
+
+  <hr>
+  <a href="/customer_list" class="btn btn-secondary">Back</a>
+  <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

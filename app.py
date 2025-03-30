@@ -704,7 +704,7 @@ def initialize_default_workflow_configurations():
         "translate_commission": {"require_subcategory": 1, "allowed_subcategory_ids": "1,2,9", "description": "เฉพาะ PA INDO"},
         "monthly_sales_my_details": {"require_subcategory": 1, "allowed_subcategory_ids": "11", "description": "เฉพาะ Admin Online"},
         "monthly_sales_my_details_full": {"require_subcategory": 1, "allowed_subcategory_ids": "11", "description": "เฉพาะ Admin Online"},
-        
+        "edit_customer_database_th": {"require_subcategory": 1, "allowed_subcategory_ids": "1,14", "description": "เฉพาะ OPD (FINANCE)"},
 
 
 
@@ -6387,7 +6387,6 @@ def tax_deduction_history():
     """
     แสดงประวัติค่าหัก ภาษี ณ ที่จ่าย ของพนักงานย้อนหลัง 12 เดือน
     """
-    from datetime import datetime
 
     today = datetime.now()
     current_year = today.year
@@ -8986,6 +8985,382 @@ def search_customer():
                                search_results=results, 
                                search_query=query, 
                                customers=all_customers)
+
+# 6. Edit Customer Database TH
+@app.route('/edit_customer_database_th/<hn>', methods=['GET', 'POST'])
+@role_required('OPD', 'ADMIN')
+@subcategory_required('edit_customer_database_th')
+def edit_customer_database_th(hn):
+    """
+    ฟังก์ชันสำหรับแก้ไขข้อมูลลูกค้า (Edit Customer) โดยอ้างอิง hn
+    - GET  : ดึงข้อมูลลูกค้าเก่าจากตาราง customers มาโชว์ในฟอร์ม
+    - POST : รับข้อมูลจากฟอร์มแล้ว UPDATE เข้าตาราง customers
+    """
+
+    # ตรวจสอบว่าล็อกอินแล้วหรือไม่ (session)
+    if not session.get('user_id'):
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+
+    # 1) Query หาข้อมูลลูกค้าจาก hn ที่ส่งมา (ถ้าไม่เจอให้แจ้งเตือน หรือ redirect)
+    customer = conn.execute("""
+        SELECT *
+        FROM customers
+        WHERE hn = ?
+    """, (hn,)).fetchone()
+
+    if not customer:
+        conn.close()
+        flash("ไม่พบข้อมูลลูกค้าตาม hn ที่ระบุ", "danger")
+        return redirect(url_for('customer_database_th'))  # หรือหน้าอื่นตามเหมาะสม
+
+    if request.method == 'POST':
+        # -----------------------------------------------
+        # 2) รับค่าจาก Form (คล้ายกับ customer_database_th)
+        # -----------------------------------------------
+        prefix                  = request.form.get('prefix')
+        first_name              = request.form.get('first_name')
+        last_name               = request.form.get('last_name')
+        nickname                = request.form.get('nickname')
+
+        # โทรศัพท์
+        country_code = request.form.get('country_code')
+        if country_code == "other":
+            custom_code = request.form.get('custom_country_code', '').strip()
+            if not custom_code.startswith('+'):
+                custom_code = '+' + custom_code
+            country_code = custom_code
+        phone_number = request.form.get('phone')
+
+        # รายชื่อรหัสประเทศที่ต้องตัด trunk prefix
+        countries_with_trunk_prefix = ['+66', '+62', '+60', '+95', '+856', '+855', '+44', '+61', '+81', '+86', '+49', '+33', '+91']
+        if country_code in countries_with_trunk_prefix and phone_number.startswith('0'):
+            phone_number = phone_number[1:]
+        phone = country_code + phone_number
+
+        # เลขบัตรประชาชน (สมมติว่ายังคงตรวจสอบ 13 หลักเหมือนเดิม)
+        id_value = request.form.get('id_value', '').strip()
+        if not id_value.isdigit() or len(id_value) != 13:
+            flash("กรุณากรอกเลขบัตรประจำตัวประชาชนให้ครบ 13 หลัก", "danger")
+            conn.close()
+            return redirect(url_for('edit_customer_database_th', hn=hn))
+        id_card_or_passport = id_value
+
+        birthday = request.form.get('birthday')
+
+        # สัญชาติ
+        nationality = request.form.get('nationality')
+        if nationality == "อื่นๆ":
+            nationality_other = request.form.get('nationality_other', '').strip()
+            if nationality_other:
+                nationality = nationality_other
+            else:
+                nationality = ""
+                flash("กรุณาระบุสัญชาติในช่อง 'อื่นๆ'", "danger")
+
+        address                 = request.form.get('address')
+        occupation              = request.form.get('occupation')
+        emergency_contact       = request.form.get('emergency_contact')
+        emergency_relationship  = request.form.get('emergency_relationship')
+        emergency_phone         = request.form.get('emergency_phone')
+
+        # ประวัติแพ้ยา
+        drug_allergy_choice = request.form.get('drug_allergy_history_choice')
+        if drug_allergy_choice == 'มี':
+            drug_allergy_history = request.form.get('drug_allergy_details', '').strip()
+            symptoms = request.form.get('drug_allergy_symptoms', '').strip()
+            if symptoms:
+                drug_allergy_history = f"{drug_allergy_history} ({symptoms})"
+        else:
+            drug_allergy_history = ""
+        drug_allergy_symptoms = ""
+
+        # โรคประจำตัว
+        chronic_disease_choice = request.form.get('chronic_disease_choice')
+        if chronic_disease_choice == 'มี':
+            chronic_disease = request.form.get('chronic_disease_details', '').strip()
+        else:
+            chronic_disease = ''
+
+        # ยาที่ใช้อยู่ในปัจจุบัน
+        current_medications_choice = request.form.get('current_medications_choice')
+        if current_medications_choice == 'มี':
+            current_medications = request.form.get('current_medications_details', '').strip()
+        else:
+            current_medications = ''
+
+        # ศัลยกรรมที่เคยทำ
+        previous_surgeries_list = request.form.getlist('previous_surgeries')
+        if "อื่นๆ" in previous_surgeries_list:
+            other_surgery = request.form.get('surgery_other_text', '').strip()
+            previous_surgeries_list.remove("อื่นๆ")
+            if other_surgery:
+                previous_surgeries_list.append(f"อื่นๆ: {other_surgery}")
+            else:
+                previous_surgeries_list.append("อื่นๆ")
+        previous_surgeries = ", ".join(previous_surgeries_list)
+
+        # ช่องทางที่รู้จักคลินิก
+        referral_channel_list = request.form.getlist('referral_channel')
+        if "อื่นๆ" in referral_channel_list:
+            referral_other = request.form.get('referral_other_text', '').strip()
+            referral_channel_list.remove("อื่นๆ")
+            if referral_other:
+                referral_channel_list.append(f"อื่นๆ: {referral_other}")
+            else:
+                referral_channel_list.append("อื่นๆ")
+        referral_channel = ", ".join(referral_channel_list)
+
+        # เหตุผลที่เลือกคลินิก
+        reason_to_choose_clinic_list = request.form.getlist('reason_to_choose_clinic')
+        if "อื่นๆ" in reason_to_choose_clinic_list:
+            reason_other = request.form.get('reason_other_text', '').strip()
+            reason_to_choose_clinic_list.remove("อื่นๆ")
+            if reason_other:
+                reason_to_choose_clinic_list.append(f"อื่นๆ: {reason_other}")
+            else:
+                reason_to_choose_clinic_list.append("อื่นๆ")
+        reason_to_choose_clinic = ", ".join(reason_to_choose_clinic_list)
+
+        # 3) ทำการ UPDATE ใน DB
+        try:
+            conn.execute("""
+                UPDATE customers
+                SET prefix                  = ?,
+                    first_name              = ?,
+                    last_name               = ?,
+                    nickname                = ?,
+                    phone                   = ?,
+                    birthday                = ?,
+                    nationality             = ?,
+                    address                 = ?,
+                    occupation              = ?,
+                    id_card_or_passport     = ?,
+                    emergency_contact       = ?,
+                    emergency_relationship  = ?,
+                    emergency_phone         = ?,
+                    drug_allergy_history    = ?,
+                    drug_allergy_symptoms   = ?,
+                    chronic_disease         = ?,
+                    current_medications     = ?,
+                    previous_surgeries      = ?,
+                    referral_channel        = ?,
+                    reason_to_choose_clinic = ?
+                WHERE hn = ?
+            """, (
+                prefix, first_name, last_name, nickname,
+                phone, birthday, nationality, address, occupation,
+                id_card_or_passport, emergency_contact, emergency_relationship, emergency_phone,
+                drug_allergy_history, drug_allergy_symptoms, chronic_disease, current_medications,
+                previous_surgeries, referral_channel, reason_to_choose_clinic,
+                hn  # WHERE
+            ))
+            conn.commit()
+            flash("อัปเดตข้อมูลลูกค้าสำเร็จ", "success")
+        except Exception as e:
+            conn.rollback()
+            print("Error during UPDATE:", e)
+            flash(f"เกิดข้อผิดพลาด: {e}", "danger")
+        finally:
+            conn.close()
+        return redirect(url_for('edit_customer_database_th', hn=hn))
+
+    else:
+        # --------------------------------------------------
+        # 4) กรณีเป็น GET => ดึง customer มาแสดงในฟอร์ม
+        # --------------------------------------------------
+        conn.close()
+        return render_template(
+            'opd/edit_customer_th.html',  # สร้างไฟล์ Template ใหม่สำหรับแก้ไข
+            customer=customer,
+        )
+
+# 7. Edit Customer Database EN
+@app.route('/edit_customer_database_en/<hn>', methods=['GET', 'POST'])
+@role_required('OPD', 'ADMIN')
+def edit_customer_database_en(hn):
+    """
+    ฟังก์ชันสำหรับแก้ไขข้อมูลลูกค้า (ภาษาอังกฤษ) โดยอ้างอิงจากหมายเลข HN
+    - GET  : ดึงข้อมูลลูกค้าจากตาราง customers มาแสดงใน Form (ภาษาอังกฤษ)
+    - POST : รับข้อมูลจาก Form แล้ว UPDATE ในตาราง customers
+    """
+
+    # 1) ตรวจสอบ Session
+    if not session.get('user_id'):
+        return redirect(url_for('login'))
+
+    # 2) ค้นหา record ลูกค้าจาก HN
+    conn = get_db_connection()
+    customer = conn.execute("""
+        SELECT *
+        FROM customers
+        WHERE hn = ?
+    """, (hn,)).fetchone()
+
+    if not customer:
+        conn.close()
+        flash("No customer found for the specified HN.", "danger")
+        return redirect(url_for('customer_database_en'))  # หรือหน้าอื่นตามสะดวก
+
+    if request.method == 'POST':
+        # ------------------------------------------------
+        # รับข้อมูลจากฟอร์ม (ลักษณะเดียวกับ customer_database_en)
+        # ------------------------------------------------
+        prefix         = request.form.get('prefix')
+        first_name     = request.form.get('first_name')
+        last_name      = request.form.get('last_name')
+        nickname       = request.form.get('nickname')
+
+        # เบอร์โทร + country code
+        country_code = request.form.get('country_code')
+        if country_code == "other":
+            custom_code = request.form.get('custom_country_code', '').strip()
+            if not custom_code.startswith('+'):
+                custom_code = '+' + custom_code
+            country_code = custom_code
+
+        phone_number = request.form.get('phone')
+
+        # ตัด trunk prefix ถ้าจำเป็น
+        countries_with_trunk_prefix = ['+66', '+62', '+60', '+95', '+856', '+855', '+44', '+61', '+81', '+86', '+49', '+33', '+91']
+        if country_code in countries_with_trunk_prefix and phone_number.startswith('0'):
+            phone_number = phone_number[1:]
+        phone = country_code + phone_number
+
+        # Passport/ID
+        id_value = request.form.get('id_value', '').strip()
+        if not id_value:
+            flash("Please enter Passport number.", "danger")
+            conn.close()
+            return redirect(url_for('edit_customer_database_en', hn=hn))
+        id_card_or_passport = id_value
+
+        birthday = request.form.get('birthday')
+
+        # สัญชาติ
+        nationality = request.form.get('nationality')
+        if nationality == "Other":
+            nationality_other = request.form.get('nationality_other', '').strip()
+            if nationality_other:
+                nationality = nationality_other
+            else:
+                flash("Please specify the nationality in 'Other'.", "danger")
+
+        address                 = request.form.get('address')
+        occupation              = request.form.get('occupation')
+        emergency_contact       = request.form.get('emergency_contact')
+        emergency_relationship  = request.form.get('emergency_relationship')
+        emergency_phone         = request.form.get('emergency_phone')
+
+        # ประวัติแพ้ยา (Drug Allergy)
+        drug_allergy_choice = request.form.get('drug_allergy_history_choice')
+        if drug_allergy_choice == 'Yes':
+            drug_allergy_details = request.form.get('drug_allergy_details', '').strip()
+            drug_allergy_symptoms = request.form.get('drug_allergy_symptoms', '').strip()
+            if drug_allergy_symptoms:
+                drug_allergy_history = f"{drug_allergy_details} ({drug_allergy_symptoms})"
+            else:
+                drug_allergy_history = drug_allergy_details
+        else:
+            drug_allergy_history = ""
+            drug_allergy_symptoms = ""
+
+        # โรคประจำตัว (Chronic Disease)
+        chronic_disease_choice = request.form.get('chronic_disease_choice')
+        if chronic_disease_choice == 'Yes':
+            chronic_disease = request.form.get('chronic_disease_details', '').strip()
+        else:
+            chronic_disease = ""
+
+        # ยาที่ใช้อยู่ในปัจจุบัน (Current Medications)
+        current_medications_choice = request.form.get('current_medications_choice')
+        if current_medications_choice == 'Yes':
+            current_medications = request.form.get('current_medications_details', '').strip()
+        else:
+            current_medications = ""
+
+        # ศัลยกรรมที่เคยทำ (Previous Surgeries)
+        previous_surgeries_list = request.form.getlist('previous_surgeries')
+        if "other" in previous_surgeries_list:
+            other_surgery = request.form.get('surgery_other_text', '').strip()
+            previous_surgeries_list.remove("other")
+            if other_surgery:
+                previous_surgeries_list.append(f"Other: {other_surgery}")
+            else:
+                previous_surgeries_list.append("Other")
+        previous_surgeries = ", ".join(previous_surgeries_list)
+
+        # ช่องทางที่รู้จักคลินิก (Referral Channel)
+        referral_channel_list = request.form.getlist('referral_channel')
+        if "other" in referral_channel_list:
+            referral_other = request.form.get('referral_other_text', '').strip()
+            referral_channel_list.remove("other")
+            if referral_other:
+                referral_channel_list.append(f"Other: {referral_other}")
+            else:
+                referral_channel_list.append("Other")
+        referral_channel = ", ".join(referral_channel_list)
+
+        # เหตุผลที่เลือกคลินิก (Reason to choose)
+        reason_to_choose_clinic_list = request.form.getlist('reason_to_choose_clinic')
+        if "Others" in reason_to_choose_clinic_list:
+            reason_other = request.form.get('reason_other_text', '').strip()
+            reason_to_choose_clinic_list.remove("Others")
+            if reason_other:
+                reason_to_choose_clinic_list.append(f"Others: {reason_other}")
+            else:
+                reason_to_choose_clinic_list.append("Others")
+        reason_to_choose_clinic = ", ".join(reason_to_choose_clinic_list)
+
+        # 3) ทำการ UPDATE ข้อมูล
+        try:
+            conn.execute("""
+                UPDATE customers
+                SET 
+                  prefix                  = ?,
+                  first_name              = ?,
+                  last_name               = ?,
+                  nickname                = ?,
+                  phone                   = ?,
+                  birthday                = ?,
+                  nationality             = ?,
+                  address                 = ?,
+                  occupation              = ?,
+                  id_card_or_passport     = ?,
+                  emergency_contact       = ?,
+                  emergency_relationship  = ?,
+                  emergency_phone         = ?,
+                  drug_allergy_history    = ?,
+                  drug_allergy_symptoms   = ?,
+                  chronic_disease         = ?,
+                  current_medications     = ?,
+                  previous_surgeries      = ?,
+                  referral_channel        = ?,
+                  reason_to_choose_clinic = ?
+                WHERE hn = ?
+            """, (
+                prefix, first_name, last_name, nickname,
+                phone, birthday, nationality, address, occupation,
+                id_card_or_passport, emergency_contact, emergency_relationship, emergency_phone,
+                drug_allergy_history, drug_allergy_symptoms, chronic_disease, current_medications,
+                previous_surgeries, referral_channel, reason_to_choose_clinic,
+                hn
+            ))
+            conn.commit()
+            flash("Customer information updated successfully.", "success")
+        except Exception as e:
+            conn.rollback()
+            flash(f"Error occurred while updating: {e}", "danger")
+        finally:
+            conn.close()
+
+        return redirect(url_for('edit_customer_database_en', hn=hn))
+
+    else:
+        # 4) กรณี GET => render Template โดยส่ง customer object ไป
+        conn.close()
+        return render_template('opd/edit_customer_en.html', customer=customer)
 
 
 

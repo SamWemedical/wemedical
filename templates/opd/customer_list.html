@@ -24,10 +24,12 @@
   <!-- Search Form -->
   <form method="GET" action="{{ url_for('search_customer') }}" class="mb-3">
     <div class="input-group">
-      <input type="text" class="form-control" name="q" placeholder="ค้นหาจาก HN, ชื่อ, นามสกุล, ชื่อเล่น, เบอร์โทรฯ" value="{{ search_query|default('') }}">
+      <input type="text" class="form-control" name="q" placeholder="ค้นหาจาก HN, ชื่อ, นามสกุล, ชื่อเล่น, เบอร์โทรฯ"
+             value="{{ search_query|default('') }}">
       <button type="submit" class="btn btn-primary">ค้นหา</button>
     </div>
   </form>
+
   {% if search_query %}
     <h3>ผลการค้นหา:</h3>
     {% if search_results %}
@@ -41,7 +43,7 @@
             <th>เบอร์โทรฯ</th>
             <th>อายุ</th>
             <th>บริการ</th>
-            <th>รายละเอียด</th>
+            <th>ดำเนินการ</th>
           </tr>
         </thead>
         <tbody>
@@ -58,12 +60,21 @@
                 {% for svc in customer.service_type | fromjson %}
                   {{ svc.short_code }} ({{ svc.record_date }}){% if not loop.last %}, {% endif %}
                 {% endfor %}
-              {% else %} - {% endif %}
+              {% else %}
+                -
+              {% endif %}
             </td>
             <td>
+              <!-- ปุ่ม View เปิด Modal -->
               <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#customerModal{{ customer.id }}">
                 View
               </button>
+              <!-- ปุ่ม Edit ไปหน้า edit_customer_database_th(hn) -->
+              {% if session.get('sub_category_id')|int in [1, 14] %}
+                <a href="{{ url_for('edit_customer_database_th', hn=customer.hn) }}" class="btn btn-sm btn-warning">
+                  Edit
+                </a>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -86,7 +97,7 @@
         <th>เบอร์โทรฯ</th>
         <th>อายุ</th>
         <th>บริการ</th>
-        <th>รายละเอียด</th>
+        <th>ดำเนินการ</th>
       </tr>
     </thead>
     <tbody>
@@ -103,12 +114,30 @@
             {% for svc in customer.service_type | fromjson %}
               {{ svc.short_code }} ({{ svc.record_date }}){% if not loop.last %}, {% endif %}
             {% endfor %}
-          {% else %} - {% endif %}
+          {% else %}
+            -
+          {% endif %}
         </td>
         <td>
+          <!-- ปุ่ม View เปิด Modal -->
           <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#customerModal{{ customer.id }}">
             View
           </button>
+          <!-- ปุ่ม Edit customer database -->
+          {% if session.get('sub_category_id')|int in [1,14] %}
+            {% if customer.nationality|default('') in ['ไทย', ''] %}
+              <!-- กรณี nationality เป็น "ไทย" หรือว่าง ให้ลิงก์ไปหน้า edit_customer_database_th -->
+              <a href="{{ url_for('edit_customer_database_th', hn=customer.hn) }}" class="btn btn-sm btn-warning">
+                Edit (TH)
+              </a>
+            {% else %}
+              <!-- กรณีเป็นสัญชาติอื่น ให้ลิงก์ไปหน้า edit_customer_database_en -->
+              <a href="{{ url_for('edit_customer_database_en', hn=customer.hn) }}" class="btn btn-sm btn-warning">
+                Edit (EN)
+              </a>
+            {% endif %}
+          {% endif %}
+
         </td>
       </tr>
       {% endfor %}
@@ -273,11 +302,16 @@
                   {% for svc in customer.service_type | fromjson %}
                     {{ svc.short_code }} ({{ svc.record_date }}){% if not loop.last %}, {% endif %}
                   {% endfor %}
-                {% else %} - {% endif %}
+                {% else %} 
+                  - 
+                {% endif %}
               </td>
             </tr>
           </tbody>
         </table>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
